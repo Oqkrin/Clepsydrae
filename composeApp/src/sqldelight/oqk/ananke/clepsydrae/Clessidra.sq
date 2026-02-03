@@ -1,0 +1,32 @@
+CREATE TABLE clepsydra (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    init_time INTEGER NOT NULL,
+    last_state_change INTEGER NOT NULL,
+    total_active_time INTEGER NOT NULL DEFAULT 0,
+    total_passive_time INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 0,
+    session_id INTEGER
+);
+
+insertClepsydra:
+INSERT INTO clepsydra(name, init_time, last_state_change, total_active_time, total_passive_time, is_active, session_id)
+VALUES(?, ?, ?, ?, ?, ?, ?);
+
+selectAllClepsydrae:
+SELECT * FROM clepsydra;
+
+selectClepsydraById:
+SELECT * FROM clepsydra WHERE id = ?;
+
+updateClepsydra:
+UPDATE clepsydra SET
+    name = ?,
+    last_state_change = ?,
+    total_active_time = ?,
+    total_passive_time = ?,
+    is_active = ?
+WHERE id = ?;
+
+deleteClepsydra:
+DELETE FROM clepsydra WHERE id = ?;
