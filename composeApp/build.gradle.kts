@@ -19,7 +19,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-
+   /*
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -29,12 +29,12 @@ kotlin {
             isStatic = true
         }
     }
-
+*/
     jvm()
 
     sourceSets {
 
-        iosMain.dependencies { implementation(libs.native.driver) }
+        /*iosMain.dependencies { implementation(libs.native.driver) }*/
 
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
@@ -57,14 +57,22 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.koin.compose.viewmodel.navigation)
+            implementation(libs.compose.material3.adaptive)
+            implementation(libs.navigation.compose)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.ui.util)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.koin.test)
         }
         jvmMain.dependencies {
-            implementation(compose.desktop.currentOs)
+            implementation(compose.desktop.currentOs) {
+                exclude(group = "org.jetbrains.compose.ui", module = "ui-util")
+            }
+            implementation("org.jetbrains.compose.ui:ui-util-desktop:${libs.versions.composeMultiplatform.get()}")
             implementation(libs.kotlinx.coroutinesSwing)
+            implementation(libs.kotlinx.datetime)
             implementation(libs.sqlite.driver)
         }
     }
