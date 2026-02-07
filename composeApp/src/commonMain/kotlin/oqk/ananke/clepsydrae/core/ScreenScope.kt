@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
+import kotlinx.datetime.LocalDate
 
 /**
  * Scope interface for screen composables providing state, actions, window info, and responsive utilities.
@@ -87,3 +88,9 @@ fun Modifier.debugBorder(dp: Dp = 1.dp ,color: Color = Color.Green): Modifier = 
 
 const val phi = 1.618f
 const val iPhi = 0.618f
+
+fun formatDate(date: LocalDate): String {
+    val dayName = date.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
+    val monthName = date.month.name.lowercase().replaceFirstChar { it.uppercase() }
+    return "$dayName ${date.day} $monthName ${date.year}"
+}

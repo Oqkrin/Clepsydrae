@@ -16,9 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.compose.runtime.State
 import androidx.window.core.layout.WindowSizeClass
-import oqk.ananke.clepsydrae.core.LocalWindowSizeClass
 import oqk.ananke.clepsydrae.core.ScreenScope
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 interface SettingsScope : ScreenScope<SettingsScreenState, SettingsAction>
@@ -29,7 +30,7 @@ fun SettingsScreen(navController: NavController) {
     val vw: SettingsScreenViewModel = koinViewModel()
     val st by vw.state.collectAsState()
     val onAction = vw::onAction
-    val ws = LocalWindowSizeClass.current
+    val ws by koinInject<State<WindowSizeClass>>()
     
     val scope = retain(st, ws, st.settings.uiScale) { object : SettingsScope {
         override val st = st

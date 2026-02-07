@@ -1,10 +1,9 @@
 package oqk.ananke.clepsydrae
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.window.core.layout.WindowSizeClass
 import oqk.ananke.clepsydrae.core.ClepsydraeTheme
 import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.di.clepsydraeModule
@@ -17,8 +16,12 @@ import org.koin.dsl.KoinConfiguration
 
 @Composable
 @Preview
-fun ClepsydraeApp(content: @Composable () -> Unit = { ClepsydraeNavigation() }) {
-    KoinApplication(KoinConfiguration { modules(clepsydraeModule()) }) {
+fun ClepsydraeApp(
+    windowSizeClass: WindowSizeClass = currentWindowAdaptiveInfo().windowSizeClass,
+    content: @Composable () -> Unit = { ClepsydraeNavigation() }
+) {
+    val windowSizeState = rememberUpdatedState(windowSizeClass)
+    KoinApplication(KoinConfiguration { modules(clepsydraeModule(windowSizeState)) }) {
 
         val repository: SettingsRepository = koinInject()
         val settings by repository.getSettings().collectAsState(Settings())
