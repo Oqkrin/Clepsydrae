@@ -150,6 +150,8 @@ fun SettingsScope.SettingsContent(modifier: Modifier = Modifier, navController: 
                 Text("Height: ${ws.minHeightDp}dp", style = MaterialTheme.typography.bodyMedium)
                 Text("Width Class: ${ws.windowWidthSizeClass}", style = MaterialTheme.typography.bodySmall)
                 Text("Height Class: ${ws.windowHeightSizeClass}", style = MaterialTheme.typography.bodySmall)
+                Text("isPortrait: $isPortrait", style = MaterialTheme.typography.bodySmall)
+
             }
         }
         
