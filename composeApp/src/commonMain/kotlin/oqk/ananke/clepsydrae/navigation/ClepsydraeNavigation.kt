@@ -13,7 +13,7 @@ import oqk.ananke.clepsydrae.settings.presentation.SettingsScreen
 import oqk.ananke.clepsydrae.statistics.presentation.StatisticsScreen
 
 @Composable
-fun AppNavigation() {
+fun ClepsydraeNavigation() {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val navController = rememberNavController()
     

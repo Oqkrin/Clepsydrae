@@ -4,6 +4,6 @@ import org.koin.dsl.module
 
 expect fun platformModule(): org.koin.core.module.Module
 
-fun appModule() = module {
+fun clepsydraeModule() = module {
     includes(platformModule())
 }

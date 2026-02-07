@@ -63,7 +63,7 @@ fun ClepsydraScope.CurrentClepsydraView() {
                     )
                 }
                 SmallFloatingActionButton(
-                    onClick = { onAction(ClepsydraAction.Close) }
+                    onClick = { onAction(ClepsydraAction.OnClose) }
                 ) {
                     Icon(Icons.Default.Close, "Close")
                 }
@@ -279,12 +279,12 @@ fun ClepsydraScope.TimerContent(elapsed: String) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
-                IconButton(onClick = { onAction(ClepsydraAction.CreateWithName) }, modifier = Modifier.size(16.dp)) {
+                IconButton(onClick = { onAction(ClepsydraAction.OnCreateWithName) }, modifier = Modifier.size(16.dp)) {
                     Icon(Icons.Default.Edit, "Edit name", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
                 }
             }
         } else {
-            IconButton(onClick = { onAction(ClepsydraAction.CreateWithName) }, modifier = Modifier.size(20.dp)) {
+            IconButton(onClick = { onAction(ClepsydraAction.OnCreateWithName) }, modifier = Modifier.size(20.dp)) {
                 Icon(Icons.Default.Edit, "Edit name", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
             }
         }
@@ -294,7 +294,7 @@ fun ClepsydraScope.TimerContent(elapsed: String) {
             fontWeight = FontWeight.Light,
             color = MaterialTheme.colorScheme.onSurface
         )
-        IconButton(onClick = { onAction(ClepsydraAction.Toggle) }) {
+        IconButton(onClick = { onAction(ClepsydraAction.ToggleDiatesi) }) {
             Icon(
                 imageVector = if (clepsydra.isActive) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = if (clepsydra.isActive) "Pause" else "Play",

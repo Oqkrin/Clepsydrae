@@ -1,71 +1,123 @@
 package oqk.ananke.clepsydrae.clepsydrae.data
 
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import oqk.ananke.clepsydrae.Database
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.ClepsydraRepository
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 class ClepsydraRepositoryImpl(private val database: Database) : ClepsydraRepository {
 
     override suspend fun insertClepsydra(clepsydra: Clepsydra): Long {
-        database.clessidraQueries.insertClepsydra(
-            name = clepsydra.name,
-            init_time = clepsydra.init.elapsedNow().inWholeMilliseconds,
-            last_state_change = clepsydra.lastStateChange.elapsedNow().inWholeMilliseconds,
-            total_active_time = clepsydra.totalActiveTime.inWholeMilliseconds,
-            total_passive_time = clepsydra.totalPassiveTime.inWholeMilliseconds,
-            is_active = if (clepsydra.isActive) 1L else 0L,
-            session_id = clepsydra.sessionId
-        )
-        return database.clessidraQueries.selectAllClepsydrae().executeAsList().lastOrNull()?.id ?: 0L
+        with(TimeScope()) {
+            database.clessidraQueries.insertClepsydra(
+                name = clepsydra.name,
+                init_time = clepsydra.init.toEpochMillis(),
+                last_state_change = clepsydra.lastStateChange.toEpochMillis(),
+                total_active_time = clepsydra.totalActiveTime.inWholeMilliseconds,
+                total_passive_time = clepsydra.totalPassiveTime.inWholeMilliseconds,
+                is_active = clepsydra.isActive.toBooleanLong(),
+                session_id = clepsydra.sessionId,
+                note = clepsydra.note,
+                journal = clepsydra.journal,
+                ended = clepsydra.ended.toBooleanLong(),
+                pomodoro_active = clepsydra.pomodoroActive.inWholeMilliseconds,
+                pomodoro_passive = clepsydra.pomodoroPassive.inWholeMilliseconds,
+                fin = clepsydra.fin?.toEpochMillis()
+            )
+        }
+        return database.clessidraQueries.lastInsertRowId().executeAsOne()
     }
 
     override suspend fun getAllClepsydrae() : List<Clepsydra> {
-        return database.clessidraQueries.selectAllClepsydrae().executeAsList().map { entity ->
-            val now = TimeSource.Monotonic.markNow()
-            Clepsydra(
-                id = entity.id,
-                name = entity.name,
-                init = now,
-                lastStateChange = now,
-                totalActiveTime = entity.total_active_time.milliseconds,
-                totalPassiveTime = entity.total_passive_time.milliseconds,
-                isActive = entity.is_active == 1L,
-                sessionId = entity.session_id
-            )
+        return with(TimeScope()) {
+            database.clessidraQueries.selectAllClepsydrae().executeAsList().map { sqliteToKotlin(it) }
         }
     }
 
-    override suspend fun getClepsydraById(id: Long): Clepsydra? {
-        val entity = database.clessidraQueries.selectClepsydraById(id).executeAsOneOrNull() ?: return null
-        val now = TimeSource.Monotonic.markNow()
-        return Clepsydra(
-            id = entity.id,
-            name = entity.name,
-            init = now,
-            lastStateChange = now,
-            totalActiveTime = entity.total_active_time.milliseconds,
-            totalPassiveTime = entity.total_passive_time.milliseconds,
-            isActive = entity.is_active == 1L,
-            sessionId = entity.session_id
-        )
+    override suspend fun getClepsydraById(id: Long): Clepsydra {
+        val entity = database.clessidraQueries.selectClepsydraById(id).executeAsOneOrNull() ?: return Clepsydra()
+        return with(TimeScope()) { sqliteToKotlin(entity) }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    override suspend fun getClepsydraeByDate(date: LocalDate): List<Clepsydra> {
+        val startOfDay = date.atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds()
+        val endOfDay = startOfDay + 1.days.inWholeMilliseconds
+        return with(TimeScope()) {
+            database.clessidraQueries.selectClepsydraeByDate(startOfDay, endOfDay).executeAsList().map { sqliteToKotlin(it) }
+        }
     }
 
     override suspend fun updateClepsydra(clepsydra: Clepsydra) {
         clepsydra.id?.let { id ->
-            database.clessidraQueries.updateClepsydra(
-                name = clepsydra.name,
-                last_state_change = clepsydra.lastStateChange.elapsedNow().inWholeMilliseconds,
-                total_active_time = clepsydra.totalActiveTime.inWholeMilliseconds,
-                total_passive_time = clepsydra.totalPassiveTime.inWholeMilliseconds,
-                is_active = if (clepsydra.isActive) 1L else 0L,
-                id = id
-            )
+            with(TimeScope()) {
+                database.clessidraQueries.updateClepsydra(
+                    name = clepsydra.name,
+                    last_state_change = clepsydra.lastStateChange.toEpochMillis(),
+                    total_active_time = clepsydra.totalActiveTime.inWholeMilliseconds,
+                    total_passive_time = clepsydra.totalPassiveTime.inWholeMilliseconds,
+                    is_active = clepsydra.isActive.toBooleanLong(),
+                    id = id,
+                    note = clepsydra.note,
+                    journal = clepsydra.journal,
+                    ended = clepsydra.ended.toBooleanLong(),
+                    pomodoro_active = clepsydra.pomodoroActive.inWholeMilliseconds,
+                    pomodoro_passive = clepsydra.pomodoroPassive.inWholeMilliseconds,
+                    fin = clepsydra.fin?.toEpochMillis()
+                )
+            }
         }
     }
 
     override suspend fun deleteClepsydra(id: Long) {
         database.clessidraQueries.deleteClepsydra(id)
     }
+
+    private fun TimeScope.sqliteToKotlin(entity: oqk.ananke.clepsydrae.Clepsydra): Clepsydra {
+        return Clepsydra(
+            id = entity.id,
+            name = entity.name,
+            init = entity.init_time.toTimeMark(),
+            lastStateChange = entity.last_state_change.toTimeMark(),
+            totalActiveTime = entity.total_active_time.milliseconds,
+            totalPassiveTime = entity.total_passive_time.milliseconds,
+            isActive = entity.is_active.toBool(),
+            sessionId = entity.session_id,
+            note = entity.note,
+            journal = entity.journal,
+            ended = entity.ended.toBool(),
+            pomodoroActive = entity.pomodoro_active.milliseconds,
+            pomodoroPassive = entity.pomodoro_passive.milliseconds,
+            fin = entity.fin?.toTimeMark()
+        )
+    }
+    
+    private fun Long.toBool(): Boolean = this != 0L
+    private fun Boolean.toBooleanLong(): Long = if (this) 1L else 0L
 }
+
+@OptIn(ExperimentalTime::class)
+class TimeScope {
+    val now: Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    val mark: TimeMark = TimeSource.Monotonic.markNow()
+    
+    fun Long.toTimeMark(): TimeMark = mark - (now - this).milliseconds
+    fun TimeMark.toEpochMillis(): Long = now - elapsedNow().inWholeMilliseconds
+}
+
+@OptIn(ExperimentalTime::class)
+fun Long.toTimeMark(): TimeMark {
+    val offset = (kotlin.time.Clock.System.now().toEpochMilliseconds() - this).milliseconds
+    return TimeSource.Monotonic.markNow() - offset
+}
+
+@OptIn(ExperimentalTime::class)
+fun TimeMark.toEpochMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds() - elapsedNow().inWholeMilliseconds

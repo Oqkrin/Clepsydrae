@@ -23,25 +23,29 @@ import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import oqk.ananke.clepsydrae.clepsydrae.domain.dts
+import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.core.LocalWindowSizeClass
 import oqk.ananke.clepsydrae.core.ScreenScope
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.ExperimentalTime
 
-interface ClepsydraScope : ScreenScope<ClepsydraState, ClepsydraAction>
+interface ClepsydraScope : ScreenScope<ClepsydraScreenState, ClepsydraAction>
 
 @Composable
 fun ClepsydraScreen(navController: NavController) {
-    val vw: ClepsydraViewModel = koinViewModel()
+    val vw: ClepsydraScreenViewModel = koinViewModel()
     val st by vw.state.collectAsState()
-    val onAction = vw::handleAction
+    val onAction = vw::onAction
     val ws = LocalWindowSizeClass.current
+    val uiScale = LocalSettings.current.uiScale
 
 
     val scope = retain(st, ws) {  object : ClepsydraScope {
         override val st = st
         override val onAction = onAction
         override val ws: WindowSizeClass = ws
+        override val uiScale: Float = uiScale
+        override val navController: NavController = navController
     } }
 
     with(scope) {
@@ -72,9 +76,9 @@ fun ClepsydraScreen(navController: NavController) {
 
 @Composable
 fun ClepsydraScope.ClepsydraBottomBar() {
-    Box(modifier = Modifier.fillMaxWidth().responsivePadding()) {
+    Box(modifier = Modifier.fillMaxWidth().adaptivePadding()) {
         FloatingActionButton(
-            onClick = { onAction(ClepsydraAction.Create) },
+            onClick = { onAction(ClepsydraAction.OnSimpleCreate) },
             modifier = Modifier.align(Alignment.Center)
         ) {
             Icon(Icons.Default.Add, "Create")
@@ -90,14 +94,14 @@ fun ClepsydraScope.ClepsydraTopBar(navController: NavController) {
         val monthName = now.month.name.lowercase().replaceFirstChar { it.uppercase() }
         "$dayName ${now.day} $monthName ${now.year}"
     }
-    Row(modifier = Modifier.fillMaxWidth().responsivePadding(), horizontalArrangement = Arrangement.SpaceAround) {
+    Row(modifier = Modifier.fillMaxWidth().adaptivePadding(), horizontalArrangement = Arrangement.SpaceAround) {
 
         FloatingActionButton(onClick = { navController.navigate("settings") }) {
             Icon(Icons.Default.Settings, "Settings")
         }
 
 
-        ExtendedFloatingActionButton(onClick = { onAction(ClepsydraAction.Create) }) {
+        ExtendedFloatingActionButton(onClick = { onAction(ClepsydraAction.OnSimpleCreate) }) {
             Text(today)
         }
 
@@ -112,17 +116,19 @@ fun ClepsydraScope.ClepsydraTopBar(navController: NavController) {
 @Composable
 fun ClepsydraScope.NameDialog() {
     AlertDialog(
-        onDismissRequest = { onAction(ClepsydraAction.ConfirmName) },
+        onDismissRequest = { onAction(ClepsydraAction.OnCreateWithName) },
         title = { Text("Timer Name") },
         text = {
-            OutlinedTextField(
-                value = st.name,
-                onValueChange = { onAction(ClepsydraAction.SetName(it)) },
-                label = { Text("Name (optional)") }
-            )
+            st.currentClepsydra?.name?.let { name ->
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { onAction(ClepsydraAction.OnSetName(name)) },
+                    label = { Text("Name (optional)") }
+                )
+            }
         },
         confirmButton = {
-            TextButton(onClick = { onAction(ClepsydraAction.ConfirmName) }) {
+            TextButton(onClick = { onAction(ClepsydraAction.OnConfirmName) }) {
                 Text("Create")
             }
         }
@@ -140,12 +146,12 @@ fun ClepsydraScope.HistoryList() {
         ) {
 
             LazyColumn(modifier = Modifier.padding(12.dp)) {
-                items(st.savedClepsydrae) { clepsydra ->
+                items(st.pastClepsydrae) { clepsydra ->
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
                             .animateItem(fadeInSpec = tween(300), fadeOutSpec = tween(300)),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        onClick = { onAction(ClepsydraAction.Restore(clepsydra)) }
+                        onClick = { onAction(ClepsydraAction.OnRestore(clepsydra)) }
                     ) {
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -169,7 +175,7 @@ fun ClepsydraScope.HistoryList() {
                             }
                             clepsydra.id?.let { id ->
                                 IconButton(
-                                    onClick = { onAction(ClepsydraAction.Delete(id)) },
+                                    onClick = { onAction(ClepsydraAction.OnDelete(id)) },
                                     modifier = Modifier.size(24.dp)
                                 ) {
                                     Icon(Icons.Default.Delete, "Delete", modifier = Modifier.size(16.dp))
