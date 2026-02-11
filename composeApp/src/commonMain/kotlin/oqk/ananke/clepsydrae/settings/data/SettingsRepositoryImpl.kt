@@ -1,9 +1,12 @@
 package oqk.ananke.clepsydrae.settings.data
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import oqk.ananke.clepsydrae.Database
+import oqk.ananke.clepsydrae.clepsydrae.data.toBool
+import oqk.ananke.clepsydrae.clepsydrae.data.toBooleanLong
 import oqk.ananke.clepsydrae.settings.domain.Settings
 import oqk.ananke.clepsydrae.settings.domain.SettingsRepository
 
@@ -15,7 +18,8 @@ class SettingsRepositoryImpl(private val database: Database) : SettingsRepositor
     private fun loadSettings(): Settings {
         val settings = database.settingsQueries.getSettings().executeAsOneOrNull()
         return Settings(
-            isDarkTheme = settings?.isDarkTheme == 1L,
+            isFirstClepsydra = settings?.isFirstClepsydra?.toBool() ?: true,
+            isDarkTheme = settings?.isDarkTheme?.toBool() ?: false,
             theme = settings?.theme ?: "rain",
             fontSize = settings?.fontSize?.toInt() ?: 14,
             uiScale = settings?.uiScale?.toFloat() ?: 1.0f
@@ -24,10 +28,11 @@ class SettingsRepositoryImpl(private val database: Database) : SettingsRepositor
     
     override suspend fun updateSettings(settings: Settings) {
         database.settingsQueries.upsertSettings(
-            isDarkTheme = if (settings.isDarkTheme) 1L else 0L,
+            isDarkTheme = settings.isDarkTheme.toBooleanLong(),
             theme = settings.theme,
             fontSize = settings.fontSize.toLong(),
-            uiScale = settings.uiScale.toDouble()
+            uiScale = settings.uiScale.toDouble(),
+            isFirstClepsydra = settings.isFirstClepsydra.toBooleanLong()
         )
         _settings.value = settings
     }

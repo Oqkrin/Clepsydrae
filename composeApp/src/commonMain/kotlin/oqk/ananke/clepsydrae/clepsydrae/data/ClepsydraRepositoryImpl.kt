@@ -99,9 +99,7 @@ class ClepsydraRepositoryImpl(private val database: Database) : ClepsydraReposit
             fin = entity.fin?.toTimeMark()
         )
     }
-    
-    private fun Long.toBool(): Boolean = this != 0L
-    private fun Boolean.toBooleanLong(): Long = if (this) 1L else 0L
+
 }
 
 @OptIn(ExperimentalTime::class)
@@ -121,3 +119,6 @@ fun Long.toTimeMark(): TimeMark {
 
 @OptIn(ExperimentalTime::class)
 fun TimeMark.toEpochMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds() - elapsedNow().inWholeMilliseconds
+
+fun Long.toBool(): Boolean = this != 0L
+fun Boolean.toBooleanLong(): Long = if (this) 1L else 0L

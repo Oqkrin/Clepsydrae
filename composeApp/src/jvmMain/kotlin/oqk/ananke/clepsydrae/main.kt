@@ -49,9 +49,8 @@ fun main() = application {
             onToggleAlwaysOnTop = { 
                 if (!alwaysOnTop.value) {
                     savedState = windowState.size to windowState.position
-                    val screenSize = Toolkit.getDefaultToolkit().screenSize
                     windowState.size = DpSize(300.dp, 300.dp)
-                    windowState.position = WindowPosition((screenSize.width - 300).dp, 0.dp)
+                    windowState.position = WindowPosition(0.dp, 0.dp)
                 } else {
                     savedState?.let { (size, pos) ->
                         windowState.size = size
@@ -105,56 +104,62 @@ fun FrameWindowScope.DesktopClepsydrae(
                 .height(24.dp)
                 .background(MaterialTheme.colorScheme.primaryContainer)) {
 
-            Box(modifier = Modifier.weight(1f)) {
+            Row {
                 IconButton(onClick = onToggleAlwaysOnTop, modifier = Modifier.size(24.dp)) {
                     Icon(
                         if (alwaysOnTop) Icons.Default.Lock else Icons.Default.PushPin,
-                        null,
+                        "alwaysOnTop",
                         modifier = Modifier.size(12.dp),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = if (alwaysOnTop) 1f else 0.3f)
                     )
                 }
+                Spacer(Modifier.size(24.dp))
             }
 
-            Row(modifier = Modifier.weight(5f).height(24.dp),
+
+            Row(modifier = Modifier.height(24.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center) {
+                horizontalArrangement = Arrangement.SpaceEvenly) {
 
                 if (!isTall) {
                     IconButton(
                         onClick = { onA(ClepsydraScreenAction.OnPreviousDay) },
-                        modifier = Modifier.size(12.dp).weight(1f)
+                        modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "go in the past",
+                            modifier = Modifier.size(12.dp),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
 
+                Spacer(Modifier.size(12.dp))
+
                 Text(
-                    modifier = Modifier.clickable(onClick = { nv.navigate("Calendar") }).weight(3f),
+                    modifier = Modifier.clickable(onClick = { nv.navigate("Calendar") }),
                     text = if (isTall) "Clepsydrae" else st.value.dateText,
                     style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onPrimaryContainer),
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
-
+                Spacer(Modifier.size(12.dp))
                 if (!isTall) {
                     IconButton(
                         onClick = { onA(ClepsydraScreenAction.OnNextDay) },
-                        modifier = Modifier.size(12.dp).weight(1f)
+                        modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward, "go in the future",
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward, "go in the future",
+                            modifier = Modifier.size(12.dp),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
             }
 
-            Row(modifier = Modifier.weight(1f),
+            Row(modifier = Modifier,
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically ) {
 

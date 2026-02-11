@@ -17,7 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.window.core.layout.WindowSizeClass
+import oqk.ananke.clepsydrae.core.LocalSettings
+import oqk.ananke.clepsydrae.core.NotificationManager
 import oqk.ananke.clepsydrae.core.ScreenScope
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -31,13 +34,17 @@ fun SettingsScreen(navController: NavController) {
     val st by vw.state.collectAsState()
     val onAction = vw::onAction
     val ws by koinInject<State<WindowSizeClass>>()
-    
+    val notificationManager: NotificationManager = koinInject()
+    val isFirstClepsydra: Boolean = LocalSettings.current.isFirstClepsydra
+
     val scope = retain(st, ws, st.settings.uiScale) { object : SettingsScope {
         override val st = st
         override val onAction = onAction
         override val ws: WindowSizeClass = ws
         override val uiScale = st.settings.uiScale
         override val navController = navController
+        override val notificationManager: NotificationManager = notificationManager
+        override val isFirstClepsydra: Boolean = isFirstClepsydra
     } }
     
     with(scope) {

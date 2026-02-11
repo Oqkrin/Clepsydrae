@@ -37,6 +37,9 @@ class SettingsScreenViewModel(private val repository: SettingsRepository) : View
                 is SettingsAction.SetUIScale -> {
                     repository.updateSettings(current.copy(uiScale = action.scale))
                 }
+                is SettingsAction.ToggleIsFirstClepsydra -> {
+                    repository.updateSettings(current.copy(isFirstClepsydra = !current.isFirstClepsydra))
+                }
             }
         }
     }

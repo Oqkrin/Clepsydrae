@@ -34,6 +34,8 @@ interface ScreenScope<S, A> {
     val uiScale: Float
     /** Navigation controller */
     val navController: NavController
+    val notificationManager: NotificationManager
+    val isFirstClepsydra: Boolean
     
     /** Width ≥ 600dp */
     val isWide: Boolean get() = ws.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
@@ -58,8 +60,11 @@ interface ScreenScope<S, A> {
         if (isPortrait) fillMaxHeight(fraction) else fillMaxWidth(fraction)
 
     /** Responsive padding based on window size */
-    fun Modifier.adaptivePadding(fixedScale: Float = 1f, minPadding: Int = 8): Modifier {
-        return padding(maxOf(minPadding, minOf(ws.minWidthDp, ws.minHeightDp)/50).adp(fixedScale))
+    fun Modifier.adaptivePadding(fixedScale: Float = 1f, minPadding: Dp = 8.dp): Modifier {
+        return padding(
+            horizontal = minPadding * fixedScale * if(isExtraWide) 3 else if(isWide) 2 else 1,
+            vertical = minPadding * fixedScale * if (isExtraTall) 3 else if(isWide) 2 else 1
+        )
     }
 
     /** make square */

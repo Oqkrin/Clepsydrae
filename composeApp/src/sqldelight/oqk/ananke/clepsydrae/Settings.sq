@@ -1,6 +1,7 @@
 CREATE TABLE settings (
     id INTEGER NOT NULL PRIMARY KEY,
     isDarkTheme INTEGER NOT NULL,
+    isFirstClepsydra INTEGER NOT NULL,
     theme TEXT NOT NULL,
     fontSize INTEGER NOT NULL,
     uiScale REAL NOT NULL
@@ -10,5 +11,5 @@ getSettings:
 SELECT * FROM settings WHERE id = 1;
 
 upsertSettings:
-INSERT OR REPLACE INTO settings(id, isDarkTheme, theme, fontSize, uiScale)
-VALUES(1, ?, ?, ?, ?);
+INSERT OR REPLACE INTO settings(id, isFirstClepsydra, isDarkTheme, theme, fontSize, uiScale)
+VALUES(1, ?,?, ?, ?, ?);

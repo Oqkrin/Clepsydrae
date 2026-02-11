@@ -31,6 +31,7 @@ fun Clepsydra.end(elapsed: Duration = lastStateChange.elapsedNow()): Clepsydra {
         activeTime = Duration.ZERO,
         totalPassiveTime = if (isActive) totalPassiveTime else totalPassiveTime + elapsed,
         totalActiveTime = if (isActive) totalActiveTime + elapsed else totalActiveTime,
+        fin = lastStateChange + elapsed
     )
 }
 
@@ -56,7 +57,20 @@ fun Clepsydra.strlapsed(elapsed: Duration = lastStateChange.elapsedNow()): Strin
 
 fun Clepsydra.shouldNotifyPomodoro(elapsed: Duration = lastStateChange.elapsedNow()): Boolean {
     val threshold = if (isActive) pomodoroActive else pomodoroPassive
-    return threshold > Duration.ZERO && elapsed.inWholeSeconds % threshold.inWholeSeconds == 1L && elapsed > threshold
+
+    // 1. Safety check
+    if (threshold <= Duration.ZERO || elapsed < threshold) return false
+
+    // 2. Modulo in seconds to catch the repeat
+    val elapsedSec = elapsed.inWholeSeconds
+    val thresholdSec = threshold.inWholeSeconds
+    val remainder = elapsedSec % thresholdSec
+
+    // 3. The "Window" Logic:
+    // Instead of checking for exactly 0, we check if we are in the first 2 seconds
+    // of a new cycle. This ensures that even if the delay(1.s) is slightly late,
+    // we still catch the trigger.
+    return remainder in 0..5
 }
 
 fun dts(duration: Duration): String {

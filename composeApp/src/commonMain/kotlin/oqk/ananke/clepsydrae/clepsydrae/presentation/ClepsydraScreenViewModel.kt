@@ -15,13 +15,17 @@ import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.ClepsydraRepository
 import oqk.ananke.clepsydrae.clepsydrae.domain.end
 import oqk.ananke.clepsydrae.clepsydrae.domain.invertiDiatesi
-import oqk.ananke.clepsydrae.clepsydrae.domain.shouldNotifyPomodoro
 import oqk.ananke.clepsydrae.core.formatDate
+import oqk.ananke.clepsydrae.settings.domain.Settings
+import oqk.ananke.clepsydrae.settings.presentation.SettingsAction
+import oqk.ananke.clepsydrae.settings.presentation.SettingsScreenViewModel
+import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 class ClepsydraScreenViewModel(private val repository: ClepsydraRepository) : ViewModel() {
@@ -30,7 +34,6 @@ class ClepsydraScreenViewModel(private val repository: ClepsydraRepository) : Vi
     
     init {
         loadClepsydraeForDate()
-        startPomodoroCheck()
     }
     
     @OptIn(ExperimentalTime::class)
@@ -49,27 +52,41 @@ class ClepsydraScreenViewModel(private val repository: ClepsydraRepository) : Vi
         }
     }
     
-    private fun startPomodoroCheck() {
-        viewModelScope.launch {
-            while (true) {
-                delay(1.seconds)
-                _state.value.currentClepsydra?.let { clepsydra ->
-                    if (clepsydra.shouldNotifyPomodoro()) {
-                        _state.update { it.copy(pomodoroNotifying = true) }
-                        delay(5.seconds)
-                        _state.update { it.copy(pomodoroNotifying = false) }
-                    }
-                }
-            }
-        }
-    }
-    
     @OptIn(ExperimentalTime::class)
     fun onAction(action: ClepsydraScreenAction) {
         when (action) {
-            is ClepsydraScreenAction.OnSimpleCreate -> {
+
+            is ClepsydraScreenAction.NotificationsPermissioner -> {
+                viewModelScope.launch {
+                    if (!action.notificationManager.canNotify() && action.isFirstClepsydra) {
+                        action.notificationManager.askPermission()
+                        action.ssvm.onAction(SettingsAction.ToggleIsFirstClepsydra)
+                    } else _state.update { it.copy(shouldAskForNotificationPermission = false) }
+                }
+            }
+
+            is ClepsydraScreenAction.OnCreateClepsydra -> {
+
+                state.value.currentClepsydra?.let {
+                    onAction(ClepsydraScreenAction.OnClose)
+                }
+
                 _state.update {
-                    it.copy(currentClepsydra = Clepsydra(lastStateChange = TimeSource.Monotonic.markNow()-4.minutes-50.seconds))
+                    val now = TimeSource.Monotonic.markNow()
+                    val fine = listOfNotNull(action.hours, action.minutes, action.seconds)
+                        .reduceOrNull { acc, d -> acc + d }
+                        ?.takeIf { value -> value > Duration.ZERO }
+
+                    it.copy(currentClepsydra =
+                        Clepsydra(
+                            name = action.name,
+                            note = action.note,
+                            init = now,
+                            pomodoroPassive = action.passiveGoal,
+                            pomodoroActive = action.activeGoal,
+                            fin = fine?.let { duration -> now + duration  }
+                        )
+                    )
                 }
             }
 
@@ -141,6 +158,22 @@ class ClepsydraScreenViewModel(private val repository: ClepsydraRepository) : Vi
                 _state.update { it.copy(selectedDate = currentDate.plus(DatePeriod(days = 1))) }
                 loadClepsydraeForDate()
             }
+
+
+            is ClepsydraScreenAction.OnPomodoroThresholdCrossed -> {
+                _state.update { it.copy(pomodoroNotifying = true) }
+                viewModelScope.launch {
+                    action.notificationManager.sendPomodoroNotification(state.value.currentClepsydra!!)
+                    delay(1.minutes)
+                    _state.update { it.copy(pomodoroNotifying = false) }
+                }
+
+            }
         }
     }
 }
+
+
+
+
+

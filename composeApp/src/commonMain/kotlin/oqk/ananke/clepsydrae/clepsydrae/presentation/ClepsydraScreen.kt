@@ -22,6 +22,7 @@ import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -34,13 +35,14 @@ import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.navigation.NavController
-import androidx.compose.runtime.State
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import oqk.ananke.clepsydrae.clepsydrae.domain.dts
+import oqk.ananke.clepsydrae.clepsydrae.domain.shouldNotifyPomodoro
 import oqk.ananke.clepsydrae.clepsydrae.domain.strlapsed
 import oqk.ananke.clepsydrae.core.*
+import oqk.ananke.clepsydrae.settings.presentation.SettingsScreenViewModel
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.sqrt
@@ -56,10 +58,16 @@ fun ClepsydraScreen(navController: NavController) {
 
     /**Scope Creation**/
     val vw: ClepsydraScreenViewModel = koinViewModel()
+
     val st by vw.state.collectAsState()
     val onAction = vw::onAction
     val ws by koinInject<State<WindowSizeClass>>()
     val uiScale = LocalSettings.current.uiScale
+    val notificationManager: NotificationManager = koinInject()
+    /*Permission Settings*/
+    val ssvm: SettingsScreenViewModel = koinViewModel()
+    val isFirstClepsydra = LocalSettings.current.isFirstClepsydra
+
 
     val scope = retain(st, ws) {
         object : ClepsydraScope {
@@ -68,178 +76,280 @@ fun ClepsydraScreen(navController: NavController) {
             override val ws: WindowSizeClass = ws
             override val uiScale: Float = uiScale
             override val navController: NavController = navController
+            override val notificationManager: NotificationManager = notificationManager
+            override val isFirstClepsydra = isFirstClepsydra
         }
     }
 
+
     with(scope) {
-        if (st.showNameDialog) NameDialog()
-
-        Box(Modifier.fillMaxSize()) {
-
-            WaterDroplets()
-
-
-            FloatingActionButton(
-                onClick = {
-                    st.currentClepsydra?.let { onAction(ClepsydraScreenAction.OnClose) }
-                        ?: onAction(ClepsydraScreenAction.OnSimpleCreate)
-                },
-                modifier = Modifier
-                    .align(if (isTall || isExtraTall) Alignment.BottomCenter else Alignment.BottomEnd)
-                    .adaptivePadding().windowInsetsPadding(WindowInsets.navigationBars)
+        Surface(Modifier.fillMaxSize()) {
+            Column(
+                Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)
             ) {
-                st.currentClepsydra?.let { Icon(Icons.Default.Close, "Create") }
-                    ?: Icon(Icons.Default.Add, "Create")
+                if (isTall || isExtraTall) {
+                    CenterAlignedTopAppBar(
+                        modifier = Modifier.fillMaxWidth(),
+                        title = { ClepsydraCalendarBar(Modifier) },
+                        navigationIcon = {
 
-            }
+                            SmallFloatingActionButton(
+                                modifier = Modifier,
+                                onClick = { onAction(ClepsydraScreenAction.ToggleHistory) }) {
+                                Icon(Icons.AutoMirrored.Filled.List, "History")
+                            }
 
-            SmallFloatingActionButton(
-                modifier = Modifier.align(Alignment.TopStart),
-                onClick = { navController.navigate("settings") }) {
-                Icon(Icons.Default.Settings, "Settings")
-            }
+                        },
+                        actions = {
+                            SmallFloatingActionButton(
+                                modifier = Modifier,
+                                onClick = { navController.navigate("settings") }) {
+                                Icon(Icons.Default.Settings, "Settings")
+                            }
+                        }
+                    )
+                }
 
-            SmallFloatingActionButton(
-                modifier = Modifier.align(Alignment.TopEnd),
-                onClick = { onAction(ClepsydraScreenAction.ToggleHistory) }) {
-                Icon(Icons.AutoMirrored.Filled.List, "History")
-            }
+                Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
 
-        }
+                    WaterDroplets()
 
-        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (!isTall && !isExtraTall) {
 
-            if (isTall || isExtraTall) {
-                ClepsydraCalendar()
-            }
+                        SmallFloatingActionButton(
+                            modifier = Modifier.align(Alignment.TopEnd).adaptivePadding(),
+                            onClick = { navController.navigate("settings") }) {
+                            Icon(Icons.Default.Settings, "Settings")
+                        }
 
-            Box(Modifier.weight(phi).fillMaxWidth(), Alignment.Center) {
-                st.currentClepsydra?.let { MorphingTimer() }
-                HistoryList()
+                        Column(Modifier.align(Alignment.TopStart)) {
+                            SmallFloatingActionButton(
+                                modifier = Modifier.adaptivePadding(),
+                                onClick = { onAction(ClepsydraScreenAction.ToggleHistory) }) {
+                                Icon(Icons.AutoMirrored.Filled.List, "History")
+                            }
+                        }
+                    }
+
+
+
+                    st.currentClepsydra?.let {
+
+                        MorphingTimer(Modifier.align(Alignment.Center))
+                        ClepsydraActionsControllerFab(
+                            text = "finish",
+                            onClick = { onAction(ClepsydraScreenAction.OnClose) },
+                            modifier = Modifier
+                                .align(if (isTall || isExtraTall) Alignment.BottomCenter else Alignment.BottomEnd)
+                                .adaptivePadding()
+                        ) {
+
+                            Icon(Icons.Default.Close, "Close")
+
+                        }
+                    } ?: ClepsydraActionsControllerFab(
+                        text = "New Clepsydra",
+
+                        onClick = {
+                            if(st.shouldAskForNotificationPermission)
+                                onAction(ClepsydraScreenAction.NotificationsPermissioner(notificationManager, isFirstClepsydra, ssvm ))
+                            onAction(ClepsydraScreenAction.OnCreateClepsydra()) },
+                        modifier = Modifier
+                            .align(if (isTall || isExtraTall) Alignment.BottomCenter else Alignment.BottomEnd)
+                            .adaptivePadding()
+                    ) {
+
+                        Icon(Icons.Default.Add, "Create")
+
+                    }
+
+                    if (st.showHistory) HistoryList()
+
+                    if (st.showNameDialog) NameDialog()
+                }
+
             }
         }
     }
 }
 
 @Composable
+fun ClepsydraScope.ClepsydraActionsControllerFab(text: String,
+                                                 onClick: () -> Unit,
+                                                 modifier: Modifier = Modifier,
+                                                 containerColor: Color = FloatingActionButtonDefaults.containerColor,
+                                                 contentColor: Color = contentColorFor(containerColor),
+                                                 content: @Composable (() -> Unit)) {
+
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+
+        if (st.shouldAskForNotificationPermission && isFirstClepsydra) {
+            ElevatedCard(
+                modifier = Modifier.padding(bottom = 8.adp()),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                Text(text = "You will be prompted to allow notification for timer", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+
+        if (isExtraWide || isWide) {
+            ExtendedFloatingActionButton(
+                onClick = onClick,
+                containerColor = containerColor,
+                contentColor = contentColor
+            ) {
+                Text(text)
+            }
+        } else {
+            if (isTall || isExtraTall) {
+                FloatingActionButton(
+                    onClick = onClick,
+                    containerColor = containerColor,
+                    contentColor = contentColor,
+                ) {
+                    content()
+                }
+            } else {
+                SmallFloatingActionButton(
+                    onClick = onClick,
+                    modifier = modifier,
+                    containerColor = containerColor,
+                    contentColor = contentColor,
+                ) {
+                    content()
+                }
+            }
+        }
+    }
+}
+@Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun ClepsydraScope.ClepsydraCalendar() {
+private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
+    // 1. Animation State
     val textOffset = remember { Animatable(0f) }
     val textScale = remember { Animatable(1f) }
     val textRotation = remember { Animatable(0f) }
     val textOpacity = remember { Animatable(1f) }
     val coroutineScope = rememberCoroutineScope()
 
+    // 2. Reusable Animation Logic (Keeps your code clean)
+    fun animateDateChange(direction: Int) {
+        coroutineScope.launch {
+            // Exit
+            launch { textScale.animateTo(1.3f, tween(100, easing = EaseInCubic)) }
+            launch { textRotation.animateTo(5f * -direction, tween(100, easing = EaseInCubic)) }
+            launch { textOpacity.animateTo(0.6f, tween(100, easing = EaseInCubic)) }
+            textOffset.animateTo(200f * -direction, tween(100, easing = EaseInCubic))
+
+            // Snap
+            textOffset.snapTo(200f * direction)
+            textRotation.snapTo(-5f * -direction)
+
+            // Enter
+            launch { textScale.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
+            launch { textRotation.animateTo(0f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
+            launch { textOpacity.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
+            textOffset.animateTo(0f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow))
+        }
+    }
+
     Row(
-        Modifier.fillMaxWidth(iPhi),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+        modifier = modifier
+            .widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp*iPhi)
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .fillMaxHeight(if(isExtraTall) .05f else .085f),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.weight(iPhi / 2f)) {
+
+        // --- Previous Button (Satellite) ---
+        Box(
+            modifier = Modifier.fillMaxHeight().sq(), // Square touch target
+            contentAlignment = Alignment.Center
+        ) {
             ArrowButton(
-                modifier = Modifier.sq(),
+                modifier = Modifier.fillMaxSize(iPhi), // Visual size is smaller (~40dp)
                 rotation = 360,
                 onClick = {
-                    coroutineScope.launch {
-                        launch { textScale.animateTo(1.3f, tween(100, easing = EaseInCubic)) }
-                        launch { textRotation.animateTo(5f, tween(100, easing = EaseInCubic)) }
-                        launch { textOpacity.animateTo(0.6f, tween(100, easing = EaseInCubic)) }
-                        textOffset.animateTo(-200f, tween(100, easing = EaseInCubic))
-                        textOffset.snapTo(200f)
-                        textRotation.snapTo(-5f)
-                        launch {
-                            textScale.animateTo(
-                                1f,
-                                spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)
-                            )
-                        }
-                        launch {
-                            textRotation.animateTo(
-                                0f,
-                                spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)
-                            )
-                        }
-                        launch {
-                            textOpacity.animateTo(
-                                1f,
-                                spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)
-                            )
-                        }
-                        textOffset.animateTo(
-                            0f,
-                            spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)
-                        )
-                    }
+                    animateDateChange(-1)
                     onAction(ClepsydraScreenAction.OnPreviousDay)
                 }
             )
         }
-        Box(Modifier.weight(phi).aspectRatio(3f), contentAlignment = Alignment.Center) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                shape = MaterialShapes.ClamShell.toShape(),
-                onClick = { navController.navigate("Calendar") },
-                color = MaterialTheme.colorScheme.primaryContainer
-            )
-            {
-                Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.adp()), contentAlignment = Alignment.Center) {
-                    Text(
-                        st.dateText,
-                        Modifier
-                            .offset(x = textOffset.value.dp)
-                            .scale(textScale.value)
-                            .rotate(textRotation.value)
-                            .alpha(textOpacity.value),
-                        maxLines = 1,
-                        textAlign = TextAlign.Center,
-                        style = (if (isExtraWide) MaterialTheme.typography.titleLargeEmphasized
-                        else if (isWide) MaterialTheme.typography.titleMediumEmphasized
-                        else MaterialTheme.typography.titleSmallEmphasized).copy(color = MaterialTheme.colorScheme.onPrimaryContainer),
-                        autoSize = if (!isWide && !isExtraWide) TextAutoSize.StepBased(2.sp) else null
-                    )
-                }
+
+        Box(
+            modifier = Modifier.fillMaxWidth(iPhi).fillMaxHeight(),
+            contentAlignment = Alignment.Center
+
+        ) {
+
+            ExtendedFloatingActionButton(
+                onClick = { navController.navigate("calendar") },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Text(
+                    text = st.dateText,
+                    modifier = Modifier
+                        .offset(x = textOffset.value.dp)
+                        .scale(textScale.value)
+                        .rotate(textRotation.value)
+                        .alpha(textOpacity.value),
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    autoSize = TextAutoSize.StepBased(2.sp)
+                )
             }
         }
-        Box(Modifier.weight(iPhi / 2f)) {
+
+        // --- Next Button (Satellite) ---
+        Box(
+            modifier = Modifier.fillMaxHeight().sq(), // Square touch target
+            contentAlignment = Alignment.Center
+        ) {
             ArrowButton(
-                modifier = Modifier.sq(),
+                modifier = Modifier.fillMaxSize(iPhi), // Visual size is smaller (~40dp)
                 rotation = 180,
                 onClick = {
-                    coroutineScope.launch {
-                        launch { textScale.animateTo(1.3f, tween(100, easing = EaseInCubic)) }
-                        launch { textRotation.animateTo(-5f, tween(100, easing = EaseInCubic)) }
-                        launch { textOpacity.animateTo(0.6f, tween(100, easing = EaseInCubic)) }
-                        textOffset.animateTo(200f, tween(100, easing = EaseInCubic))
-                        textOffset.snapTo(-200f)
-                        textRotation.snapTo(5f)
-                        launch {
-                            textScale.animateTo(
-                                1f,
-                                spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)
-                            )
-                        }
-                        launch {
-                            textRotation.animateTo(
-                                0f,
-                                spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)
-                            )
-                        }
-                        launch {
-                            textOpacity.animateTo(
-                                1f,
-                                spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)
-                            )
-                        }
-                        textOffset.animateTo(
-                            0f,
-                            spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)
-                        )
-                    }
+                    animateDateChange(1)
                     onAction(ClepsydraScreenAction.OnNextDay)
                 }
             )
         }
     }
+}
+// Updated ArrowButton to ensure it handles the modifier passed correctly
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ClepsydraScope.ArrowButton(
+    modifier: Modifier = Modifier,
+    rotation: Int,
+    onClick: () -> Unit
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+
+    // Animate scale: shrink slightly when pressed (inverse phi effect)
+    val targetScale = if (pressed) iPhi else 1f
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow)
+    )
+
+    Box(
+        modifier = modifier
+            .scale(scale)
+            // Apply shadow/clip before background
+            .shadow(4.dp, MaterialShapes.Arrow.toShape(rotation))
+            .clip(MaterialShapes.Arrow.toShape(rotation))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {}
+
 }
 
 
@@ -421,7 +531,7 @@ fun ClepsydraScope.WaterDroplets() {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun ClepsydraScope.MorphingTimer() {
+fun ClepsydraScope.MorphingTimer(modifier: Modifier = Modifier) {
     val clepsydra = st.currentClepsydra ?: return
 
     val colors = MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.inversePrimary
@@ -441,6 +551,7 @@ fun ClepsydraScope.MorphingTimer() {
     LaunchedEffect(clepsydra.lastStateChange) {
         while (true) {
             elapsed = clepsydra.strlapsed()
+            if (clepsydra.shouldNotifyPomodoro() && !st.pomodoroNotifying) onAction(ClepsydraScreenAction.OnPomodoroThresholdCrossed(notificationManager))
             delay(1.seconds)
         }
     }
@@ -476,7 +587,7 @@ fun ClepsydraScope.MorphingTimer() {
     val matrix = remember { Matrix() }
 
     Box(
-        Modifier
+        modifier
             .fillMaxSize()
             .aspectRatio(1f, !isPortrait)
             .graphicsLayer {
@@ -543,7 +654,7 @@ fun ClepsydraScope.TimerContent(elapsed: String) {
             text = elapsed,
             style = MaterialTheme.typography.displayLarge,
             fontWeight = FontWeight.Light,
-            color = MaterialTheme.colorScheme.onSurface
+            color = if(!st.pomodoroNotifying) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.error
         )
         IconButton(onClick = { onAction(ClepsydraScreenAction.ToggleDiatesi) }) {
             Icon(
@@ -556,26 +667,4 @@ fun ClepsydraScope.TimerContent(elapsed: String) {
 }
 
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun ClepsydraScope.ArrowButton( modifier: Modifier = Modifier,rotation: Int, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        if (pressed) phi else 1f,
-        spring(Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
-    )
-    
-    Box(
-        modifier
-            .scale(scale)
-            .shadow(12.dp, MaterialShapes.Arrow.toShape(rotation))
-            .clip(MaterialShapes.Arrow.toShape(rotation))
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable(
-                interactionSource = interaction,
-                indication = LocalIndication.current,
-                onClick = onClick
-            )
-    )
-}
+
