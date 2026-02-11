@@ -3,9 +3,7 @@ package oqk.ananke.clepsydrae.core
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
@@ -29,24 +28,27 @@ interface ScreenScope<S, A> {
     /** Action handler */
     val onAction: (A) -> Unit
     /** Window size class for responsive layout */
-    val ws: WindowSizeClass
+    val wsc: WindowSizeClass
+    val sizes: DpSize
     /** User-configured UI scale (0.75-1.5x) */
     val uiScale: Float
     /** Navigation controller */
     val navController: NavController
     val notificationManager: NotificationManager
     val isFirstClepsydra: Boolean
-    
+
+    val isShort: Boolean get() = wsc.isShort()
+    val isNarrow: Boolean get() = wsc.isNarrow()
     /** Width ≥ 600dp */
-    val isWide: Boolean get() = ws.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+    val isWide: Boolean get() = wsc.isWide()
     /** Width ≥ 840dp */
-    val isExtraWide: Boolean get() = ws.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+    val isExtraWide: Boolean get() = wsc.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
     /** Height ≥ 600dp */
-    val isTall: Boolean get() = ws.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
+    val isTall: Boolean get() = wsc.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
     /** Height ≥ 840dp */
-    val isExtraTall: Boolean get() = ws.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND)
+    val isExtraTall: Boolean get() = wsc.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND)
     /** Portrait orientation based on breakpoints */
-    val isPortrait: Boolean get() = (isTall && !(isWide || isExtraWide)) || (isExtraTall && !isExtraWide)
+    val isPortrait: Boolean get() = sizes.isPortrait()
     /** Automatic scale based on window size (1x/2x/3x) */
     val adaptiveScale: Float get() = if(isExtraWide) 3f else if(isWide) 2f else 1f
     /** Combined user scale × adaptive scale */
@@ -99,3 +101,18 @@ fun formatDate(date: LocalDate): String {
     val monthName = date.month.name.lowercase().replaceFirstChar { it.uppercase() }
     return "$dayName ${date.day} $monthName ${date.year}"
 }
+
+fun WindowSizeClass.isTall(): Boolean = this.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
+fun WindowSizeClass.isWide(): Boolean = this.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
+fun WindowSizeClass.isExtraWide(): Boolean = this.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
+fun WindowSizeClass.isExtraTall(): Boolean = this.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND)
+fun WindowSizeClass.isShort(): Boolean = !this.isTall() && !this.isExtraTall()
+fun WindowSizeClass.isNarrow(): Boolean = !this.isWide() && !this.isExtraWide()
+
+fun DpSize.isPortrait(): Boolean = this.height > this.width
+fun DpSize.isLandscape(): Boolean = this.width > this.height
+fun DpSize.isSquare(): Boolean = this.width == this.height
+fun DpSize.min(): Dp = if(this.isPortrait()) this.width else this.height
+fun DpSize.max(): Dp = if(this.isPortrait()) this.height else this.width
+fun DpSize.minSquared(): DpSize = DpSize(min(), min())
+fun DpSize.maxSquared(): DpSize = DpSize(max(), max())

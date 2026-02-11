@@ -8,18 +8,19 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.*
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
 import androidx.window.core.layout.WindowSizeClass
 import oqk.ananke.clepsydrae.core.LocalSettings
+import oqk.ananke.clepsydrae.core.LocalSizeInfo
 import oqk.ananke.clepsydrae.core.NotificationManager
 import oqk.ananke.clepsydrae.core.ScreenScope
 import org.koin.compose.koinInject
@@ -30,17 +31,20 @@ interface SettingsScope : ScreenScope<SettingsScreenState, SettingsAction>
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(navController: NavController) {
+
+    val notificationManager: NotificationManager = koinInject()
     val vw: SettingsScreenViewModel = koinViewModel()
     val st by vw.state.collectAsState()
     val onAction = vw::onAction
-    val ws by koinInject<State<WindowSizeClass>>()
-    val notificationManager: NotificationManager = koinInject()
+    val wsc = LocalSizeInfo.current.sizeClass
+    val sizes = LocalSizeInfo.current.sizes
     val isFirstClepsydra: Boolean = LocalSettings.current.isFirstClepsydra
 
-    val scope = retain(st, ws, st.settings.uiScale) { object : SettingsScope {
+    val scope = retain(st, wsc, st.settings.uiScale) { object : SettingsScope {
         override val st = st
         override val onAction = onAction
-        override val ws: WindowSizeClass = ws
+        override val wsc: WindowSizeClass = wsc
+        override val sizes: DpSize = sizes
         override val uiScale = st.settings.uiScale
         override val navController = navController
         override val notificationManager: NotificationManager = notificationManager
@@ -154,10 +158,10 @@ fun SettingsScope.SettingsContent(modifier: Modifier = Modifier, navController: 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Window Size", style = MaterialTheme.typography.titleMedium)
-                Text("Width: ${ws.minWidthDp}dp", style = MaterialTheme.typography.bodyMedium)
-                Text("Height: ${ws.minHeightDp}dp", style = MaterialTheme.typography.bodyMedium)
-                Text("Width Class: ${ws.windowWidthSizeClass}", style = MaterialTheme.typography.bodySmall)
-                Text("Height Class: ${ws.windowHeightSizeClass}", style = MaterialTheme.typography.bodySmall)
+                Text("Width: ${wsc.minWidthDp}dp", style = MaterialTheme.typography.bodyMedium)
+                Text("Height: ${wsc.minHeightDp}dp", style = MaterialTheme.typography.bodyMedium)
+                Text("Width Class: ${wsc.windowWidthSizeClass}", style = MaterialTheme.typography.bodySmall)
+                Text("Height Class: ${wsc.windowHeightSizeClass}", style = MaterialTheme.typography.bodySmall)
                 Text("isPortrait: $isPortrait", style = MaterialTheme.typography.bodySmall)
 
             }

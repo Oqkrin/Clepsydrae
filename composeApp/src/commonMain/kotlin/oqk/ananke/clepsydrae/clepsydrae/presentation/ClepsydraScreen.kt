@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.graphics.shapes.CornerRounding
@@ -57,23 +58,25 @@ interface ClepsydraScope : ScreenScope<ClepsydraScreenState, ClepsydraScreenActi
 fun ClepsydraScreen(navController: NavController) {
 
     /**Scope Creation**/
+    val notificationManager: NotificationManager = koinInject()
+    val ssvm: SettingsScreenViewModel = koinViewModel()
     val vw: ClepsydraScreenViewModel = koinViewModel()
-
     val st by vw.state.collectAsState()
     val onAction = vw::onAction
-    val ws by koinInject<State<WindowSizeClass>>()
+
+    val ws = LocalSizeInfo.current.sizeClass
+    val sz = LocalSizeInfo.current.sizes
     val uiScale = LocalSettings.current.uiScale
-    val notificationManager: NotificationManager = koinInject()
     /*Permission Settings*/
-    val ssvm: SettingsScreenViewModel = koinViewModel()
     val isFirstClepsydra = LocalSettings.current.isFirstClepsydra
 
 
-    val scope = retain(st, ws) {
+    val scope = retain(ws, sz, st) {
         object : ClepsydraScope {
             override val st = st
             override val onAction = onAction
-            override val ws: WindowSizeClass = ws
+            override val wsc: WindowSizeClass = ws
+            override val sizes: DpSize = sz
             override val uiScale: Float = uiScale
             override val navController: NavController = navController
             override val notificationManager: NotificationManager = notificationManager

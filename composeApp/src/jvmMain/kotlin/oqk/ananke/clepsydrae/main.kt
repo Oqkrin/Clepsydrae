@@ -1,182 +1,91 @@
 package oqk.ananke.clepsydrae
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.window.WindowDraggableArea
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowDpSize
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.window.*
-import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
 import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenAction
 import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenViewModel
-import oqk.ananke.clepsydrae.core.debugBorder
-import java.awt.Toolkit
+import oqk.ananke.clepsydrae.core.LocalSizeInfo
+import oqk.ananke.clepsydrae.core.SizeInfo
+import oqk.ananke.clepsydrae.core.isShort
+import oqk.ananke.clepsydrae.core.minSquared
+import oqk.ananke.clepsydrae.core.phi
 import oqk.ananke.clepsydrae.navigation.ClepsydraeNavigation
-import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.time.ExperimentalTime
 
-private var alwaysOnTop = mutableStateOf(false)
-private var savedState: Pair<DpSize, WindowPosition>? = null
-
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 fun main() = application {
-    val windowState = rememberWindowState(width = 400.dp, height = 600.dp)
-    
+
+    val windowState = rememberWindowState()
+    val clepsydraeWindowState = rememberClepsydraeWindowState(windowState)
+
     Window(
         onCloseRequest = ::exitApplication,
         title = "Clepsydrae",
         state = windowState,
         undecorated = true,
-        alwaysOnTop = alwaysOnTop.value
+        alwaysOnTop = clepsydraeWindowState.isAlwaysOnTop
     ) {
-        AppWithTitleBar(
-            onMinimize = { window.isMinimized = true },
-            onClose = ::exitApplication,
-            alwaysOnTop = alwaysOnTop.value,
-            onToggleAlwaysOnTop = { 
-                if (!alwaysOnTop.value) {
-                    savedState = windowState.size to windowState.position
-                    windowState.size = DpSize(300.dp, 300.dp)
-                    windowState.position = WindowPosition(0.dp, 0.dp)
-                } else {
-                    savedState?.let { (size, pos) ->
-                        windowState.size = size
-                        windowState.position = pos
-                    }
-                }
-                alwaysOnTop.value = !alwaysOnTop.value
-            }
+
+        val monitorSize by mutableStateOf(getMonitorSize())
+        clepsydraeWindowState.compactSize = remember(monitorSize) { monitorSize.minSquared() / 2 * phi }
+
+        ClepsydraeApp {
+            MainContent(
+                windowSizeClass = LocalSizeInfo.current.sizeClass,
+                clepsydraeWindowState = clepsydraeWindowState,
+                onClose = ::exitApplication
+            )
+        }
+    }
+}
+
+@Composable
+fun FrameWindowScope.MainContent(
+    windowSizeClass: WindowSizeClass,
+    clepsydraeWindowState: ClepsydraeWindowState,
+    onClose: () -> Unit
+) {
+    val viewModel: ClepsydraScreenViewModel = koinViewModel()
+    val state by viewModel.state.collectAsState()
+    val navController = rememberNavController()
+
+    // Determine UI mode based on window height
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ClepsydraWindowTitleBar(
+            title = if (windowSizeClass.isShort()) state.dateText else "Clepsydrae",
+            isAlwaysOnTop = clepsydraeWindowState.isAlwaysOnTop,
+            isCompact = windowSizeClass.isShort(),
+            onToggleAlwaysOnTop = clepsydraeWindowState::toggleCompactMode,
+            onMinimize = clepsydraeWindowState::minimize,
+            onClose = onClose,
+            onNavigateCalendar = { navController.navigate("Calendar") },
+            onPreviousDay = { viewModel.onAction(ClepsydraScreenAction.OnPreviousDay) },
+            onNextDay = { viewModel.onAction(ClepsydraScreenAction.OnNextDay) }
         )
+
+        // The Navigation Host takes up the remaining space
+        ClepsydraeNavigation(navController)
     }
 }
 
 @Composable
-fun FrameWindowScope.AppWithTitleBar(
-    onMinimize: () -> Unit,
-    onClose: () -> Unit,
-    alwaysOnTop: Boolean,
-    onToggleAlwaysOnTop: () -> Unit
-) {
-    val windowSizeClass by rememberUpdatedState(currentWindowAdaptiveInfo().windowSizeClass)
-
-    ClepsydraeApp(windowSizeClass) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            DesktopClepsydrae(onMinimize, onClose, alwaysOnTop, onToggleAlwaysOnTop)
-        }
+fun FrameWindowScope.getMonitorSize(): DpSize {
+    val bounds = window.graphicsConfiguration.bounds
+    return with(LocalDensity.current) {
+        DpSize(bounds.width.toDp(), bounds.height.toDp())
     }
 }
 
-@OptIn(ExperimentalTime::class)
-@Composable
-fun FrameWindowScope.DesktopClepsydrae(
-    onMinimize: () -> Unit,
-    onClose: () -> Unit,
-    alwaysOnTop: Boolean,
-    onToggleAlwaysOnTop: () -> Unit
-) {
-    val ws by koinInject<State<WindowSizeClass>>()
-    val cvw: ClepsydraScreenViewModel = koinViewModel()
-    val st = cvw.state.collectAsState()
-    val onA = cvw::onAction
-    val nv = rememberNavController()
-    val isTall = ws.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND)
-            || ws.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
-
-    WindowDraggableArea {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer)) {
-
-            Row {
-                IconButton(onClick = onToggleAlwaysOnTop, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        if (alwaysOnTop) Icons.Default.Lock else Icons.Default.PushPin,
-                        "alwaysOnTop",
-                        modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = if (alwaysOnTop) 1f else 0.3f)
-                    )
-                }
-                Spacer(Modifier.size(24.dp))
-            }
-
-
-            Row(modifier = Modifier.height(24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly) {
-
-                if (!isTall) {
-                    IconButton(
-                        onClick = { onA(ClepsydraScreenAction.OnPreviousDay) },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "go in the past",
-                            modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-
-                Spacer(Modifier.size(12.dp))
-
-                Text(
-                    modifier = Modifier.clickable(onClick = { nv.navigate("Calendar") }),
-                    text = if (isTall) "Clepsydrae" else st.value.dateText,
-                    style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onPrimaryContainer),
-                    maxLines = 1,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.size(12.dp))
-                if (!isTall) {
-                    IconButton(
-                        onClick = { onA(ClepsydraScreenAction.OnNextDay) },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward, "go in the future",
-                            modifier = Modifier.size(12.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-            }
-
-            Row(modifier = Modifier,
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically ) {
-
-                IconButton(onClick = onMinimize, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Minimize, null, modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                }
-                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, null, modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        }
-    }
-
-    ClepsydraeNavigation(nv)
-
-}
