@@ -1,9 +1,10 @@
 package oqk.ananke.clepsydrae.di
 
+import oqk.ananke.clepsydrae.core.NotificationManager
 import org.koin.dsl.module
 
-expect fun platformModule(): org.koin.core.module.Module
+expect fun platformModule(notificationManager: NotificationManager): org.koin.core.module.Module
 
-fun clepsydraeModule() = module {
-    includes(platformModule())
+fun clepsydraeModule(notificationManager: NotificationManager) = module {
+    includes(platformModule(notificationManager))
 }

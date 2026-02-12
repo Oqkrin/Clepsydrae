@@ -34,8 +34,6 @@ interface ScreenScope<S, A> {
     val uiScale: Float
     /** Navigation controller */
     val navController: NavController
-    val notificationManager: NotificationManager
-    val isFirstClepsydra: Boolean
 
     val isShort: Boolean get() = wsc.isShort()
     val isNarrow: Boolean get() = wsc.isNarrow()

@@ -13,12 +13,16 @@ import oqk.ananke.clepsydrae.settings.data.SettingsRepositoryImpl
 import oqk.ananke.clepsydrae.settings.domain.SettingsRepository
 import oqk.ananke.clepsydrae.settings.presentation.SettingsScreenViewModel
 
-actual fun platformModule() = module {
+actual fun platformModule(notificationManager: NotificationManager) = module {
     single { DriverFactory(androidContext()) }
     single { createDatabase(get()) }
     single<SettingsRepository> { SettingsRepositoryImpl(get()) }
     single<ClepsydraRepository> { ClepsydraRepositoryImpl(get()) }
-    single<NotificationManager> { AndroidNotificationManager(androidContext()) }
-    factory { ClepsydraScreenViewModel(get()) }
+    single<NotificationManager> { notificationManager }
+    factory { ClepsydraScreenViewModel(
+        clepsydraRepository = get(),
+        settingsRepository = get(),
+        notificationManager = get()
+    ) }
     factory { SettingsScreenViewModel(get()) }
 }

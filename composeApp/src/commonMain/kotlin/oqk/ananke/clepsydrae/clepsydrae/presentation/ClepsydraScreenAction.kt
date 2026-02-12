@@ -1,31 +1,34 @@
 package oqk.ananke.clepsydrae.clepsydrae.presentation
 
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
-import oqk.ananke.clepsydrae.core.NotificationManager
-import oqk.ananke.clepsydrae.settings.presentation.SettingsScreenViewModel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 sealed interface ClepsydraScreenAction {
     data class OnCreateClepsydra(
         val presetClepsydra: Clepsydra? = null,
         val name: String = presetClepsydra?.name ?: "",
         val note: String = presetClepsydra?.note ?: "",
-        val hours: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeHours?.hours,
-        val minutes: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeMinutes?.minutes,
-        val seconds: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeSeconds?.seconds,
+        val now: TimeMark = TimeSource.Monotonic.markNow(),
+        val initHours: Duration? = presetClepsydra?.init?.elapsedNow()?.inWholeHours?.hours,
+        val initMinutes: Duration? = presetClepsydra?.init?.elapsedNow()?.inWholeMinutes?.minutes,
+        val initSeconds: Duration? = presetClepsydra?.init?.elapsedNow()?.inWholeSeconds?.seconds,
+        val init: TimeMark? = null,
+        val finHours: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeHours?.hours,
+        val finMinutes: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeMinutes?.minutes,
+        val finSeconds: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeSeconds?.seconds,
+        val fin: TimeMark? = null,
         val activeGoal: Duration = presetClepsydra?.pomodoroActive ?: Duration.ZERO,
         val passiveGoal: Duration = presetClepsydra?.pomodoroPassive ?: Duration.ZERO,
-        val isActive: Boolean = presetClepsydra?.isActive ?: false
+        val startActive: Boolean = presetClepsydra?.isActive ?: false
     ) : ClepsydraScreenAction
 
-    data class NotificationsPermissioner(
-    val notificationManager: NotificationManager,
-    val isFirstClepsydra: Boolean,
-    val ssvm: SettingsScreenViewModel
-    ) : ClepsydraScreenAction
+    data object OnFirstClepsydraCreation: ClepsydraScreenAction
+    data object OnFirstClepsydraCreationOnResult: ClepsydraScreenAction
     data object OnCreateWithName : ClepsydraScreenAction
     data object OnClose : ClepsydraScreenAction
     data object ToggleDiatesi : ClepsydraScreenAction
@@ -37,5 +40,5 @@ sealed interface ClepsydraScreenAction {
     data class OnDelete(val id: Long) : ClepsydraScreenAction
     data object OnPreviousDay : ClepsydraScreenAction
     data object OnNextDay : ClepsydraScreenAction
-    data class OnPomodoroThresholdCrossed(val notificationManager: NotificationManager): ClepsydraScreenAction
+    data object OnPomodoroThresholdCrossed: ClepsydraScreenAction
 }

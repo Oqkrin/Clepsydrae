@@ -1,9 +1,13 @@
 package oqk.ananke.clepsydrae.clepsydrae.presentation
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,7 +16,10 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
@@ -27,6 +34,7 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
@@ -39,16 +47,20 @@ import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.dts
 import oqk.ananke.clepsydrae.clepsydrae.domain.shouldNotifyPomodoro
 import oqk.ananke.clepsydrae.clepsydrae.domain.strlapsed
 import oqk.ananke.clepsydrae.core.*
-import oqk.ananke.clepsydrae.settings.presentation.SettingsScreenViewModel
-import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.sqrt
 import kotlin.random.Random
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 interface ClepsydraScope : ScreenScope<ClepsydraScreenState, ClepsydraScreenAction>
 
@@ -58,8 +70,6 @@ interface ClepsydraScope : ScreenScope<ClepsydraScreenState, ClepsydraScreenActi
 fun ClepsydraScreen(navController: NavController) {
 
     /**Scope Creation**/
-    val notificationManager: NotificationManager = koinInject()
-    val ssvm: SettingsScreenViewModel = koinViewModel()
     val vw: ClepsydraScreenViewModel = koinViewModel()
     val st by vw.state.collectAsState()
     val onAction = vw::onAction
@@ -67,9 +77,8 @@ fun ClepsydraScreen(navController: NavController) {
     val ws = LocalSizeInfo.current.sizeClass
     val sz = LocalSizeInfo.current.sizes
     val uiScale = LocalSettings.current.uiScale
-    /*Permission Settings*/
-    val isFirstClepsydra = LocalSettings.current.isFirstClepsydra
 
+    val isFirst = LocalSettings.current.isFirstClepsydra
 
     val scope = retain(ws, sz, st) {
         object : ClepsydraScope {
@@ -79,18 +88,23 @@ fun ClepsydraScreen(navController: NavController) {
             override val sizes: DpSize = sz
             override val uiScale: Float = uiScale
             override val navController: NavController = navController
-            override val notificationManager: NotificationManager = notificationManager
-            override val isFirstClepsydra = isFirstClepsydra
         }
     }
 
 
     with(scope) {
         Surface(Modifier.fillMaxSize()) {
+
+            if (isFirst) {
+                NotificationPermissionPopUp(st.showNotificationPermissionPopUp) {
+                    onAction(ClepsydraScreenAction.OnFirstClepsydraCreationOnResult)
+                }
+            }
+
             Column(
                 Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)
             ) {
-                if (isTall || isExtraTall) {
+                if (!isShort) {
                     CenterAlignedTopAppBar(
                         modifier = Modifier.fillMaxWidth(),
                         title = { ClepsydraCalendarBar(Modifier) },
@@ -117,7 +131,7 @@ fun ClepsydraScreen(navController: NavController) {
 
                     WaterDroplets()
 
-                    if (!isTall && !isExtraTall) {
+                    if (isShort) {
 
                         SmallFloatingActionButton(
                             modifier = Modifier.align(Alignment.TopEnd).adaptivePadding(),
@@ -134,96 +148,179 @@ fun ClepsydraScreen(navController: NavController) {
                         }
                     }
 
+                        st.currentClepsydra?.let {
 
+                            MorphingTimer(Modifier.align(Alignment.Center))
 
-                    st.currentClepsydra?.let {
+                            SmallFloatingActionButton(
+                                modifier = Modifier
+                                    .align(if (!isShort) Alignment.BottomCenter else Alignment.BottomEnd)
+                                    .adaptivePadding(),
+                                onClick = { onAction(ClepsydraScreenAction.OnClose) },
+                            ) {
+                                Icon(Icons.Default.Close, "Close")
+                            }
+                        } ?: ClepsydraInputForm(modifier = Modifier
+                            .align(if (!isShort) Alignment.BottomCenter else Alignment.BottomEnd)
+                            .adaptivePadding().fillMaxWidth(iPhi))
 
-                        MorphingTimer(Modifier.align(Alignment.Center))
-                        ClepsydraActionsControllerFab(
-                            text = "finish",
-                            onClick = { onAction(ClepsydraScreenAction.OnClose) },
-                            modifier = Modifier
-                                .align(if (isTall || isExtraTall) Alignment.BottomCenter else Alignment.BottomEnd)
-                                .adaptivePadding()
-                        ) {
-
-                            Icon(Icons.Default.Close, "Close")
-
-                        }
-                    } ?: ClepsydraActionsControllerFab(
-                        text = "New Clepsydra",
-
-                        onClick = {
-                            if(st.shouldAskForNotificationPermission)
-                                onAction(ClepsydraScreenAction.NotificationsPermissioner(notificationManager, isFirstClepsydra, ssvm ))
-                            onAction(ClepsydraScreenAction.OnCreateClepsydra()) },
-                        modifier = Modifier
-                            .align(if (isTall || isExtraTall) Alignment.BottomCenter else Alignment.BottomEnd)
+                            /*ClepsydraActionsControllerFab(modifier = Modifier
+                            .align(if (!isShort) Alignment.BottomCenter else Alignment.BottomEnd)
                             .adaptivePadding()
-                    ) {
-
-                        Icon(Icons.Default.Add, "Create")
-
-                    }
+                            )*/
 
                     if (st.showHistory) HistoryList()
 
-                    if (st.showNameDialog) NameDialog()
                 }
-
             }
         }
     }
 }
+
+data class inputClepsydraFormState(
+    val presetClepsydra: Clepsydra? = null,
+    val name: String = presetClepsydra?.name ?: "",
+    val note: String = presetClepsydra?.note ?: "",
+    val now: TimeMark = TimeSource.Monotonic.markNow(),
+    val initHours: Duration? = presetClepsydra?.init?.elapsedNow()?.inWholeHours?.hours,
+    val initMinutes: Duration? = presetClepsydra?.init?.elapsedNow()?.inWholeMinutes?.minutes,
+    val initSeconds: Duration? = presetClepsydra?.init?.elapsedNow()?.inWholeSeconds?.seconds,
+    val init: TimeMark? = null,
+    val finHours: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeHours?.hours,
+    val finMinutes: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeMinutes?.minutes,
+    val finSeconds: Duration? = presetClepsydra?.fin?.elapsedNow()?.inWholeSeconds?.seconds,
+    val fin: TimeMark? = null,
+    val activeGoal: Duration = presetClepsydra?.pomodoroActive ?: Duration.ZERO,
+    val passiveGoal: Duration = presetClepsydra?.pomodoroPassive ?: Duration.ZERO,
+    val startActive: Boolean = presetClepsydra?.isActive ?: false
+)
 
 @Composable
-fun ClepsydraScope.ClepsydraActionsControllerFab(text: String,
-                                                 onClick: () -> Unit,
-                                                 modifier: Modifier = Modifier,
-                                                 containerColor: Color = FloatingActionButtonDefaults.containerColor,
-                                                 contentColor: Color = contentColorFor(containerColor),
-                                                 content: @Composable (() -> Unit)) {
+fun ClepsydraScope.ClepsydraInputForm(modifier: Modifier) {
+    val name = rememberTextFieldState()
+    val note = rememberTextFieldState()
+    var formState by retain { mutableStateOf(inputClepsydraFormState()) }
 
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    if (isNarrow) {
+        if(!isShort) {
+            Column(modifier ,horizontalAlignment = Alignment.CenterHorizontally) {
 
-        if (st.shouldAskForNotificationPermission && isFirstClepsydra) {
-            ElevatedCard(
-                modifier = Modifier.padding(bottom = 8.adp()),
-                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Text(text = "You will be prompted to allow notification for timer", style = MaterialTheme.typography.labelSmall)
+                Row(Modifier.weight(1f)) {
+                    Box(modifier.weight(1f).debugBorder())
+                    Box(modifier.weight(1f).debugBorder(color = Color.Red))
+                    OutlinedTextField(name, modifier = Modifier.weight(1f))
+                    Box(modifier.weight(1f).debugBorder())
+                    Box(modifier.weight(1f).debugBorder(color = Color.Red))
+                }
+
+                Row(Modifier.weight(1f)) {
+                    Box(modifier.weight(1f).debugBorder())
+                    Box(modifier.weight(1f).debugBorder())
+                    OutlinedTextField(note, modifier = Modifier.weight(1f))
+                    Box(modifier.weight(1f).debugBorder())
+                    Box(modifier.weight(1f).debugBorder())
+                }
+
+                Row(Modifier.weight(1f)) {
+                    Box(modifier.weight(1f).debugBorder())
+                    Box(modifier.weight(1f).debugBorder())
+                    Switch(
+                        modifier = Modifier.weight(1f),
+                        checked = formState.startActive,
+                        onCheckedChange = { formState = formState.copy(startActive = !formState.startActive)},
+                        thumbContent = { Text(if(formState.startActive) "ACTIVE" else "PASSIVE") },
+                    )
+                    Box(modifier.weight(1f).debugBorder())
+                    Box(modifier.weight(1f).debugBorder(color = Color.Red))
+                }
+
+                Row(Modifier.weight(1f).debugBorder()) {
+                    Box(modifier.weight(1f).debugBorder(color = Color.Red))
+                    ElevatedCard(Modifier.weight(1f)) { Text("Pomodoro Active goal: ") }
+                    ElevatedCard(Modifier.weight(1f)) { Text("Pomodoro Passive goal: ") }
+                    Box(modifier.weight(1f).debugBorder())
+                }
+
+                Row(Modifier.weight(1f).debugBorder()) {
+                    ElevatedCard(Modifier.weight(2f)) { Text("Init Time:") }
+                    Box(modifier = Modifier.weight(1f)) {
+                        SmallFloatingActionButton(
+                            modifier = Modifier.fillMaxSize(iPhi),
+                            shape = CircleShape,
+                            onClick = {}) {
+                            Icon(Icons.Default.Add, "Add")
+                        }
+                    }
+                    ElevatedCard(Modifier.weight(2f)) { Text("Fin Time:") }
+                }
             }
         }
-
-        if (isExtraWide || isWide) {
-            ExtendedFloatingActionButton(
-                onClick = onClick,
-                containerColor = containerColor,
-                contentColor = contentColor
-            ) {
-                Text(text)
+    } else {
+        Row(modifier, verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceEvenly) {
+            autoHiddenField(icon = Icons.Default.Edit) {
+                SmallFloatingActionButton(modifier = Modifier, onClick = {}) {}
             }
-        } else {
-            if (isTall || isExtraTall) {
-                FloatingActionButton(
-                    onClick = onClick,
-                    containerColor = containerColor,
-                    contentColor = contentColor,
-                ) {
-                    content()
+            autoHiddenField(icon = Icons.Default.Key) {
+                SmallFloatingActionButton(modifier = Modifier, onClick = {}) {}
+            }
+            autoHiddenField(icon = Icons.Default.EditNote) {
+                SmallFloatingActionButton(modifier = Modifier, onClick = {}) {}
+            }
+            autoHiddenField(icon = Icons.Default.ErrorOutline) {
+                SmallFloatingActionButton(modifier = Modifier, onClick = {}) {}
+            }
+            autoHiddenField(icon = Icons.Default.EditCalendar) {
+                SmallFloatingActionButton(modifier = Modifier, onClick = {}) {}
+            }
+            autoHiddenField(icon = Icons.Default.ArrowCircleLeft) {
+                SmallFloatingActionButton(modifier = Modifier, onClick = {}) {}
+            }
+            SmallFloatingActionButton(shape = CircleShape, onClick = {}) {
+                Icon(Icons.Default.Add, "Add")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun autoHiddenField(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    hiddenContent: @Composable () -> Unit
+) {
+    var show by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        AnimatedContent(
+            targetState = show,
+            label = "Auto Hidden Field",
+            transitionSpec = {
+                fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+            }
+        ) { isVisible ->
+            if (isVisible) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(modifier = Modifier.size(56.dp/phi), contentAlignment = Alignment.Center){
+                        IconButton(modifier = Modifier.fillMaxSize(iPhi) ,onClick = {show = !show}) {
+                            Icon(icon, "Icon")
+                        }
+                    }
+                    hiddenContent()
+
                 }
             } else {
-                SmallFloatingActionButton(
-                    onClick = onClick,
-                    modifier = modifier,
-                    containerColor = containerColor,
-                    contentColor = contentColor,
-                ) {
-                    content()
+                // Show a placeholder or nothing
+                Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center){
+                    IconButton(modifier = Modifier.fillMaxSize(iPhi) ,onClick = {show = !show}) {
+                        Icon(icon, "Icon")
+                    }
                 }
             }
         }
     }
 }
+
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
@@ -353,29 +450,6 @@ fun ClepsydraScope.ArrowButton(
         contentAlignment = Alignment.Center
     ) {}
 
-}
-
-
-@Composable
-fun ClepsydraScope.NameDialog() {
-    AlertDialog(
-        onDismissRequest = { onAction(ClepsydraScreenAction.OnCreateWithName) },
-        title = { Text("Timer Name") },
-        text = {
-            st.currentClepsydra?.name?.let { name ->
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { onAction(ClepsydraScreenAction.OnSetName(name)) },
-                    label = { Text("Name (optional)") }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onAction(ClepsydraScreenAction.OnConfirmName) }) {
-                Text("Create")
-            }
-        }
-    )
 }
 
 @Composable
@@ -554,7 +628,7 @@ fun ClepsydraScope.MorphingTimer(modifier: Modifier = Modifier) {
     LaunchedEffect(clepsydra.lastStateChange) {
         while (true) {
             elapsed = clepsydra.strlapsed()
-            if (clepsydra.shouldNotifyPomodoro() && !st.pomodoroNotifying) onAction(ClepsydraScreenAction.OnPomodoroThresholdCrossed(notificationManager))
+            if (clepsydra.shouldNotifyPomodoro() && !st.pomodoroNotifying) onAction(ClepsydraScreenAction.OnPomodoroThresholdCrossed)
             delay(1.seconds)
         }
     }

@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import oqk.ananke.clepsydrae.core.ClepsydraeTheme
 import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.core.LocalSizeInfo
+import oqk.ananke.clepsydrae.core.NotificationManager
 import oqk.ananke.clepsydrae.core.SizeInfo
 import oqk.ananke.clepsydrae.di.clepsydraeModule
 import oqk.ananke.clepsydrae.navigation.ClepsydraeNavigation
@@ -19,6 +20,7 @@ import org.koin.dsl.koinConfiguration
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun ClepsydraeApp(
+    notificationManager: NotificationManager,
     clepsydraeScreenContent: @Composable () -> Unit = { ClepsydraeNavigation() }
 ) {
     // Pass windowSizeClass to Koin if your module really needs it dynamically,
@@ -26,7 +28,7 @@ fun ClepsydraeApp(
 
 
     KoinApplication(
-        configuration = koinConfiguration(declaration = { modules(clepsydraeModule()) })
+        configuration = koinConfiguration(declaration = { modules(clepsydraeModule(notificationManager)) })
     ) {
         val repository: SettingsRepository = koinInject()
         val settings by repository.getSettings().collectAsState(Settings())

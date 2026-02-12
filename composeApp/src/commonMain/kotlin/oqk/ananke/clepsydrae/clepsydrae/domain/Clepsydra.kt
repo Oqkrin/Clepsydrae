@@ -80,3 +80,5 @@ fun dts(duration: Duration): String {
         if (hours > 0) "$hours:$mm:$ss" else "$mm:$ss"
     }
 }
+
+fun Duration.asText(): String = dts(this)

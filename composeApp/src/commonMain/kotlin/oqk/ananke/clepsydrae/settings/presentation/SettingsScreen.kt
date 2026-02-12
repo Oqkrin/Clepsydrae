@@ -6,7 +6,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.FirstPage
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.PlusOne
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
@@ -32,13 +34,11 @@ interface SettingsScope : ScreenScope<SettingsScreenState, SettingsAction>
 @Composable
 fun SettingsScreen(navController: NavController) {
 
-    val notificationManager: NotificationManager = koinInject()
     val vw: SettingsScreenViewModel = koinViewModel()
     val st by vw.state.collectAsState()
     val onAction = vw::onAction
     val wsc = LocalSizeInfo.current.sizeClass
     val sizes = LocalSizeInfo.current.sizes
-    val isFirstClepsydra: Boolean = LocalSettings.current.isFirstClepsydra
 
     val scope = retain(st, wsc, st.settings.uiScale) { object : SettingsScope {
         override val st = st
@@ -47,8 +47,6 @@ fun SettingsScreen(navController: NavController) {
         override val sizes: DpSize = sizes
         override val uiScale = st.settings.uiScale
         override val navController = navController
-        override val notificationManager: NotificationManager = notificationManager
-        override val isFirstClepsydra: Boolean = isFirstClepsydra
     } }
     
     with(scope) {
@@ -80,6 +78,29 @@ fun SettingsScope.SettingsContent(modifier: Modifier = Modifier, navController: 
         modifier = modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Show notification permission PopUp",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = st.settings.isFirstClepsydra,
+                    onCheckedChange = { onAction(SettingsAction.ToggleIsFirstClepsydra) }
+                )
+            }
+        }
+
         Card(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),

@@ -33,18 +33,20 @@ fun FrameWindowScope.ClepsydraWindowTitleBar(
                 .fillMaxWidth()
                 .height(32.dp) // Slightly taller for better touch target
                 .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left: Window Mode Controls
-            IconButton(onClick = onToggleAlwaysOnTop, modifier = Modifier.size(24.dp)) {
-                Icon(
-                    imageVector = if (isAlwaysOnTop) Icons.Default.Lock else Icons.Default.PushPin,
-                    contentDescription = "Toggle Always On Top",
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = if (isAlwaysOnTop) 1f else 0.5f)
-                )
+            Row {
+                IconButton(onClick = onToggleAlwaysOnTop, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        imageVector = if (isAlwaysOnTop) Icons.Default.Lock else Icons.Default.PushPin,
+                        contentDescription = "Toggle Always On Top",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = if (isAlwaysOnTop) 1f else 0.5f)
+                    )
+                }
+                Spacer(modifier = Modifier.size(24.dp))
             }
 
             // Center: Date Navigation
