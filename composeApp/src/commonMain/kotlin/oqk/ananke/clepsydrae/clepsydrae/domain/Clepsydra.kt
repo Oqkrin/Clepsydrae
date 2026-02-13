@@ -1,13 +1,20 @@
 package oqk.ananke.clepsydrae.clepsydrae.domain
 
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.todayIn
+import oqk.ananke.clepsydrae.clepsydrae.data.toTimeMark
+import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 import kotlin.time.TimeMark
+
 data class Clepsydra(
     val id: Long? = null,
     val name: String? = "",
     val note: String? = null,
-    val journal: String? = null,
+    val tags: Set<String>? = null,
     val init: TimeMark = TimeSource.Monotonic.markNow(),
     val lastStateChange: TimeMark = init,
     val activeTime: Duration = Duration.ZERO,
@@ -80,5 +87,12 @@ fun dts(duration: Duration): String {
         if (hours > 0) "$hours:$mm:$ss" else "$mm:$ss"
     }
 }
+
+fun Duration.asTimeMarkFromStartOfDay(): TimeMark = startOfDay() + this
+
+@OptIn(ExperimentalTime::class)
+fun startOfDay(): TimeMark = Clock.System.todayIn(TimeZone.currentSystemDefault())
+    .atStartOfDayIn(TimeZone.currentSystemDefault())
+    .toEpochMilliseconds().toTimeMark()
 
 fun Duration.asText(): String = dts(this)

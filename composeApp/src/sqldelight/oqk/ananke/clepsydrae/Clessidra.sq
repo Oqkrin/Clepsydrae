@@ -2,7 +2,7 @@ CREATE TABLE clepsydra (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     note TEXT,
-    journal TEXT,
+    tags TEXT,
     init_time INTEGER NOT NULL,
     last_state_change INTEGER NOT NULL,
     total_active_time INTEGER NOT NULL DEFAULT 0,
@@ -16,7 +16,7 @@ CREATE TABLE clepsydra (
 );
 
 insertClepsydra:
-INSERT INTO clepsydra(name, note, journal, init_time, last_state_change, total_active_time, total_passive_time, is_active, ended, session_id, pomodoro_active, pomodoro_passive, fin)
+INSERT INTO clepsydra(name, note, tags, init_time, last_state_change, total_active_time, total_passive_time, is_active, ended, session_id, pomodoro_active, pomodoro_passive, fin)
 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 lastInsertRowId:
@@ -36,7 +36,7 @@ updateClepsydra:
 UPDATE clepsydra SET
     name = ?,
     note = ?,
-    journal = ?,
+    tags = ?,
     last_state_change = ?,
     total_active_time = ?,
     total_passive_time = ?,

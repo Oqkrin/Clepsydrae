@@ -13,6 +13,7 @@ sealed interface ClepsydraScreenAction {
         val presetClepsydra: Clepsydra? = null,
         val name: String = presetClepsydra?.name ?: "",
         val note: String = presetClepsydra?.note ?: "",
+        val tags: Set<String> = presetClepsydra?.tags ?: emptySet(),
         val now: TimeMark = TimeSource.Monotonic.markNow(),
         val initHours: Duration? = presetClepsydra?.init?.elapsedNow()?.inWholeHours?.hours,
         val initMinutes: Duration? = presetClepsydra?.init?.elapsedNow()?.inWholeMinutes?.minutes,

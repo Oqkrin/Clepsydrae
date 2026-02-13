@@ -93,6 +93,7 @@ class ClepsydraScreenViewModel(
                         Clepsydra(
                             name = cc.name,
                             note = cc.note,
+                            tags = cc.tags,
                             init = cc.init ?: (cc.now + (init ?: Duration.ZERO)),
                             pomodoroPassive = cc.passiveGoal,
                             pomodoroActive = cc.activeGoal,

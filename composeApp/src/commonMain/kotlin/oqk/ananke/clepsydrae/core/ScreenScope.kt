@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.datetime.LocalDate
@@ -29,7 +30,7 @@ interface ScreenScope<S, A> {
     val onAction: (A) -> Unit
     /** Window size class for responsive layout */
     val wsc: WindowSizeClass
-    val sizes: DpSize
+    val sizes: DpSize //avelible screen size
     /** User-configured UI scale (0.75-1.5x) */
     val uiScale: Float
     /** Navigation controller */
@@ -59,13 +60,44 @@ interface ScreenScope<S, A> {
     fun Modifier.fillMaxBiggest(fraction: Float = 1f): Modifier =
         if (isPortrait) fillMaxHeight(fraction) else fillMaxWidth(fraction)
 
-    /** Responsive padding based on window size */
+    /** * Fluidly lerps padding based on the window's actual dimensions.
+     * Maps the size range (600dp - 1200dp) to a scale range (1x - 3x).
+     */
     fun Modifier.adaptivePadding(fixedScale: Float = 1f, minPadding: Dp = 8.dp): Modifier {
+        // We define the "Floor" and "Ceiling" for our fluid scaling
+        val minLimit = 480.dp
+        val maxLimit = 1200.dp
+
+        // Calculate a 0.0 -> 1.0 progress based on width and height separately
+        val hProgress = ((sizes.width - minLimit) / (maxLimit - minLimit)).coerceIn(0f, 1f)
+        val vProgress = ((sizes.height - minLimit) / (maxLimit - minLimit)).coerceIn(0f, 1f)
+
+        // Lerp the multiplier.
+        // 1f + (hProgress * 2f) smoothly transitions from 1.0 to 3.0
+        val hMultiplier = 1f + (hProgress * 2f)
+        val vMultiplier = 1f + (vProgress * 2f)
+
         return padding(
-            horizontal = minPadding * fixedScale * if(isExtraWide) 3 else if(isWide) 2 else 1,
-            vertical = minPadding * fixedScale * if (isExtraTall) 3 else if(isWide) 2 else 1
+            horizontal = minPadding * fixedScale * hMultiplier,
+            vertical = minPadding * fixedScale * vMultiplier
         )
     }
+
+    /** * A "Better" Adaptive Scale:
+     * Instead of 1f, 2f, or 3f, it returns a precise float like 1.42f
+     * based on the window's smallest dimension.
+     */
+    val fluidScale: Float get() {
+        val minDim = sizes.min()
+        return when {
+            minDim < 600.dp -> 1f
+            minDim < 840.dp -> lerp(1f.dp, 2f.dp, (minDim - 600.dp) / (840.dp - 600.dp)).value
+            else -> lerp(2f.dp, 3f.dp, (minDim - 840.dp) / (1200.dp - 840.dp)).value
+        }.coerceIn(1f, 3f)
+    }
+
+    /** Replaces effectiveScale with a smoother version */
+    val smoothEffectiveScale: Float get() = uiScale * fluidScale
 
     /** make square */
     fun Modifier.sq(matchHeightConstraintsFirst: Boolean = false): Modifier = aspectRatio(1f, matchHeightConstraintsFirst)

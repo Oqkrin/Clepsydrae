@@ -1,6 +1,5 @@
 package oqk.ananke.clepsydrae.clepsydrae.data
 
-import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -26,7 +25,7 @@ class ClepsydraRepositoryImpl(private val database: Database) : ClepsydraReposit
                 is_active = clepsydra.isActive.toBooleanLong(),
                 session_id = clepsydra.sessionId,
                 note = clepsydra.note,
-                journal = clepsydra.journal,
+                tags = clepsydra.tags?.joinToString(prefix = "#", separator = " #"),
                 ended = clepsydra.ended.toBooleanLong(),
                 pomodoro_active = clepsydra.pomodoroActive.inWholeMilliseconds,
                 pomodoro_passive = clepsydra.pomodoroPassive.inWholeMilliseconds,
@@ -67,7 +66,7 @@ class ClepsydraRepositoryImpl(private val database: Database) : ClepsydraReposit
                     is_active = clepsydra.isActive.toBooleanLong(),
                     id = id,
                     note = clepsydra.note,
-                    journal = clepsydra.journal,
+                    tags = clepsydra.tags?.joinToString(prefix = "#", separator = " #"),
                     ended = clepsydra.ended.toBooleanLong(),
                     pomodoro_active = clepsydra.pomodoroActive.inWholeMilliseconds,
                     pomodoro_passive = clepsydra.pomodoroPassive.inWholeMilliseconds,
@@ -92,7 +91,8 @@ class ClepsydraRepositoryImpl(private val database: Database) : ClepsydraReposit
             isActive = entity.is_active.toBool(),
             sessionId = entity.session_id,
             note = entity.note,
-            journal = entity.journal,
+            tags = entity.tags?.split("#")?.filter { it.isNotEmpty() }
+                ?.map { it.trim().replace(' ', '_') + " " }?.toSet(),
             ended = entity.ended.toBool(),
             pomodoroActive = entity.pomodoro_active.milliseconds,
             pomodoroPassive = entity.pomodoro_passive.milliseconds,
@@ -106,7 +106,6 @@ class ClepsydraRepositoryImpl(private val database: Database) : ClepsydraReposit
 class TimeScope {
     val now: Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
     val mark: TimeMark = TimeSource.Monotonic.markNow()
-    
     fun Long.toTimeMark(): TimeMark = mark - (now - this).milliseconds
     fun TimeMark.toEpochMillis(): Long = now - elapsedNow().inWholeMilliseconds
 }
