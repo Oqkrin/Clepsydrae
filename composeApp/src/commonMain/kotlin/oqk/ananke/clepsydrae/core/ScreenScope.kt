@@ -105,7 +105,7 @@ interface ScreenScope<S, A> {
     /** Convert Int to adaptive Dp */
     fun Int.adp(fixedScale: Float = 1f): Dp = this.dp.adaptive(fixedScale)
     /** Apply effective scale to Dp */
-    fun Dp.adaptive(fixedScale: Float = 1f): Dp = this * effectiveScale * fixedScale
+    fun Dp.adaptive(fixedScale: Float = 1f): Dp = this * smoothEffectiveScale * fixedScale
 
     @Composable
     fun ConditionalLayout(condition: Boolean,

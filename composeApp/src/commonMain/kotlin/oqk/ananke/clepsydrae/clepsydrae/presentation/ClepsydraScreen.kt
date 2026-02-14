@@ -145,9 +145,7 @@ fun ClepsydraScreen(navController: NavController) {
                             ) {
                                 Icon(Icons.Default.Close, "Close")
                             }
-                        } ?: ClepsydraInputForm(modifier = Modifier
-                            .align(if (!isShort) Alignment.BottomCenter else Alignment.BottomEnd)
-                            .fillMaxWidth().fillMaxHeight(iPhi).adaptivePadding())
+                        } ?: ClepsydraInputForm(modifier = Modifier.align(Alignment.BottomCenter))
 
 
                     if (st.showHistory) HistoryList()
