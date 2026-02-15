@@ -3,16 +3,14 @@ package oqk.ananke.clepsydrae.clepsydrae.presentation
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.input.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -22,11 +20,15 @@ import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -46,9 +48,7 @@ import kotlinx.coroutines.flow.update
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.asTimeMarkFromStartOfDay
 import oqk.ananke.clepsydrae.core.LocalSettings
-import oqk.ananke.clepsydrae.core.debugBorder
 import oqk.ananke.clepsydrae.core.iPhi
-import oqk.ananke.clepsydrae.core.phi
 import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -59,54 +59,23 @@ import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 // ============================================================================
-// RESPONSIVE SIZING CONFIGURATION
+// COMPACT TOKENS (structural, not “just a scale knob”)
 // ============================================================================
 
-/**
- * Responsive sizing configuration based on window width
- */
-data class ResponsiveSizing(
-    val goalCardHeight: Dp,
-    val centerButtonSize: Dp,
-    val timePickerMaxHeight: Dp,
-    val iconSize: Dp,
-    val smallIconSize: Dp,
-    val spacing: Dp,
-    val textScale: Float
-)
-
-@Composable
-private fun ClepsydraScope.rememberResponsiveSizing(): ResponsiveSizing {
-    val width = sizes.width
-
-    return remember(width) {
-        val scale = when {
-            width < 400.dp -> 0.75f  // Compact: 300-400dp
-            width < 600.dp -> 0.9f   // Small: 400-600dp
-            width < 800.dp -> 1.0f   // Medium: 600-800dp
-            width < 1200.dp -> 1.15f // Large: 800-1200dp
-            else -> 1.3f          // Extra Large: 1200dp+
-        }
-
-        ResponsiveSizing(
-            goalCardHeight = (64.dp * scale).coerceAtLeast(48.dp),
-            centerButtonSize = (56.dp * scale).coerceAtLeast(44.dp),
-            timePickerMaxHeight = (56.dp * scale).coerceAtLeast(44.dp),
-            iconSize = (24.dp * scale).coerceAtLeast(18.dp),
-            smallIconSize = (20.dp * scale).coerceAtLeast(16.dp),
-            spacing = (8.dp * scale).coerceAtLeast(4.dp),
-            textScale = scale.coerceIn(0.85f, 1.2f)
-        )
-    }
-}
+private val ClepsydraScope.TAP: Dp     // Material minimum touch target
+    get() = 48.adp()
+private val FAB: Dp = 56.dp
+private val GAP: Dp = 4.dp
+private val PAD_OUTER: Dp = 6.dp
+private val PAD_INNER_H: Dp = 8.dp
+private val PAD_INNER_V: Dp = 6.dp
+private val ICON: Dp = 20.dp
+private val LABEL_SP = 10.sp
 
 // ============================================================================
 // DOMAIN MODELS
 // ============================================================================
 
-/**
- * Form state for creating or editing a Clepsydra timer
- */
 data class InputClepsydraFormState(
     val presetClepsydra: Clepsydra? = null,
     val name: String = presetClepsydra?.name ?: "",
@@ -125,149 +94,92 @@ data class InputClepsydraFormState(
     val startActive: Boolean = false
 )
 
-/**
- * Modes for time input: NONE (not set), DURATION (relative), TIMESTAMP (absolute)
- */
 enum class TimeInputMode {
     NONE, DURATION, TIMESTAMP;
-
     fun next(): TimeInputMode = entries[(ordinal + 1) % entries.size]
 }
 
 // ============================================================================
-// MAIN FORM COMPONENT
+// MAIN FORM — stacking triggers via isNarrow (from ClepsydraScope)
 // ============================================================================
 
-/**
- * Main input form for creating Clepsydra timers with start/end times and goals
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ClepsydraScope.ClepsydraInputForm(modifier: Modifier = Modifier) {
     val formState_ = retain { MutableStateFlow(InputClepsydraFormState()) }
     val formState by formState_.asStateFlow().collectAsState()
-    val sizing = rememberResponsiveSizing()
 
     LaunchedEffect(Unit) {
-        snapshotFlow { formState }
-            .distinctUntilChanged()
-            .collect { /* Sync if needed */ }
+        snapshotFlow { formState }.distinctUntilChanged().collect { }
     }
 
-    Box(modifier = modifier.adaptivePadding().fillMaxWidth().adaptivePadding()) {
-        Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.adaptivePadding()) {
-            // Left side: Active goal and start time
-            LeftTimeSection(
-                formState = formState,
-                onFormUpdate = formState_::update,
-                sizing = sizing,
-                modifier = Modifier.weight(phi)
-            )
+    // Card width clamps that do NOT force min=280 when the window is smaller.
+    val maxCard = (sizes.width - 8.dp).coerceAtLeast(0.dp)
+    val minCard = minOf(280.dp, maxCard)
 
-            // Center: Start mode toggle and create button
-            CenterActionSection(
-                formState = formState,
-                onFormUpdate = formState_::update,
-                sizing = sizing,
-                modifier = Modifier.width(sizing.centerButtonSize)
-            )
+    Box(
+        modifier = modifier.adaptivePadding(minPadding = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        ElevatedCard(
+            modifier = Modifier
+                .widthIn(min = minCard, max = maxCard)
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(28.dp)
+        ) {
+            val contentMax = (maxCard - PAD_OUTER * 2).coerceAtLeast(0.dp)
 
-            // Right side: Passive goal and end time
-            RightTimeSection(
-                formState = formState,
-                onFormUpdate = formState_::update,
-                sizing = sizing,
-                modifier = Modifier.weight(phi)
-            )
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(PAD_OUTER)
+                ) {
+                    val usable = (contentMax).coerceAtLeast(280.dp)
+                    val sideMax = (usable * 0.44f).coerceAtLeast(150.dp)
+                    val centerMax = (usable * 0.18f).coerceAtLeast(TAP)
+
+                    LeftTimeSection(formState, formState_::update, maxWidth = sideMax)
+                    CenterActionSection(formState, formState_::update, maxWidth = centerMax)
+                    RightTimeSection(formState, formState_::update, maxWidth = sideMax)
+                }
+            }
         }
     }
-}
-
 // ============================================================================
-// FORM SECTIONS
+// SECTIONS
 // ============================================================================
 
 @Composable
 private fun ClepsydraScope.LeftTimeSection(
     formState: InputClepsydraFormState,
     onFormUpdate: (InputClepsydraFormState.() -> InputClepsydraFormState) -> Unit,
-    sizing: ResponsiveSizing,
-    modifier: Modifier = Modifier
-) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.End) {
-        Column(horizontalAlignment = Alignment.End) {
-            GoalCard(
-                label = "Pomodoro Active",
-                duration = formState.activeGoal,
-                onDurationChange = { duration ->
-                    onFormUpdate { copy(activeGoal = duration) }
-                },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                sizing = sizing,
-                modifier = Modifier.adaptivePadding(),
-            )
-
-            ClepsydraTimePicker(
-                label = "Start",
-                hours = formState.initHours,
-                minutes = formState.initMinutes,
-                seconds = formState.initSeconds,
-                timeMark = formState.initTimeMark,
-                onTimeChanged = { h, m, s, tm ->
-                    onFormUpdate {
-                        copy(
-                            initHours = h,
-                            initMinutes = m,
-                            initSeconds = s,
-                            initTimeMark = tm
-                        )
-                    }
-                },
-                sizing = sizing,
-                isTowardsLeft = true
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun ClepsydraScope.CenterActionSection(
-    formState: InputClepsydraFormState,
-    onFormUpdate: (InputClepsydraFormState.() -> InputClepsydraFormState) -> Unit,
-    sizing: ResponsiveSizing,
+    maxWidth: Dp,
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Bottom
+        modifier = modifier.widthIn(max = maxWidth),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(GAP)
     ) {
-        Text(
-            text = "Start as",
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = (MaterialTheme.typography.labelSmall.fontSize.value * sizing.textScale).sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Medium
+        GoalCard(
+            label = "Pomodoro Active",
+            duration = formState.activeGoal,
+            onDurationChange = { d -> onFormUpdate { copy(activeGoal = d) } },
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.widthIn(max = maxWidth)
         )
 
-        Spacer(modifier = Modifier.height(sizing.spacing))
-
-        StartModeToggle(
-            startActive = formState.startActive,
-            onToggle = { startActive ->
-                onFormUpdate { copy(startActive = startActive) }
+        ClepsydraTimePicker(
+            label = "Start",
+            hours = formState.initHours,
+            minutes = formState.initMinutes,
+            seconds = formState.initSeconds,
+            timeMark = formState.initTimeMark,
+            onTimeChanged = { h, m, s, tm ->
+                onFormUpdate { copy(initHours = h, initMinutes = m, initSeconds = s, initTimeMark = tm) }
             },
-            sizing = sizing,
-            modifier = Modifier.width(sizing.centerButtonSize).height(sizing.goalCardHeight)
-        )
-
-        Spacer(modifier = Modifier.height(sizing.spacing))
-
-        CreateButtonSection(
-            formState = formState,
-            sizing = sizing,
-            modifier = Modifier.width(sizing.centerButtonSize).wrapContentHeight()
+            isTowardsLeft = true,
+            maxWidth = maxWidth
         )
     }
 }
@@ -276,122 +188,84 @@ private fun ClepsydraScope.CenterActionSection(
 private fun ClepsydraScope.RightTimeSection(
     formState: InputClepsydraFormState,
     onFormUpdate: (InputClepsydraFormState.() -> InputClepsydraFormState) -> Unit,
-    sizing: ResponsiveSizing,
+    maxWidth: Dp,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.Start) {
-        Column {
-            GoalCard(
-                label = "Pomodoro Passive",
-                duration = formState.passiveGoal,
-                onDurationChange = { duration ->
-                    onFormUpdate { copy(passiveGoal = duration) }
-                },
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                sizing = sizing,
-                modifier = Modifier.adaptivePadding()
-            )
+    Column(
+        modifier = modifier.widthIn(max = maxWidth),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(GAP)
+    ) {
+        GoalCard(
+            label = "Pomodoro Passive",
+            duration = formState.passiveGoal,
+            onDurationChange = { d -> onFormUpdate { copy(passiveGoal = d) } },
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.widthIn(max = maxWidth)
+        )
 
-            ClepsydraTimePicker(
-                label = "End",
-                hours = formState.finHours,
-                minutes = formState.finMinutes,
-                seconds = formState.finSeconds,
-                timeMark = formState.finTimeMark,
-                onTimeChanged = { h, m, s, tm ->
-                    onFormUpdate {
-                        copy(
-                            finHours = h,
-                            finMinutes = m,
-                            finSeconds = s,
-                            finTimeMark = tm
-                        )
-                    }
-                },
-                sizing = sizing,
-                isTowardsLeft = false
-            )
-        }
+        ClepsydraTimePicker(
+            label = "End",
+            hours = formState.finHours,
+            minutes = formState.finMinutes,
+            seconds = formState.finSeconds,
+            timeMark = formState.finTimeMark,
+            onTimeChanged = { h, m, s, tm ->
+                onFormUpdate { copy(finHours = h, finMinutes = m, finSeconds = s, finTimeMark = tm) }
+            },
+            isTowardsLeft = false,
+            maxWidth = maxWidth
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ClepsydraScope.CreateButtonSection(
+private fun ClepsydraScope.CenterActionSection(
     formState: InputClepsydraFormState,
-    sizing: ResponsiveSizing,
+    onFormUpdate: (InputClepsydraFormState.() -> InputClepsydraFormState) -> Unit,
+    maxWidth: Dp,
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier,
+        modifier = modifier.widthIn(max = maxWidth),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy((-4.dp * sizing.textScale))
+        verticalArrangement = Arrangement.Bottom
     ) {
-        // Presets button (top cap)
-        Surface(
-            onClick = { },
+        Text(
+            text = "Start as",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = LABEL_SP,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
+        StartModeToggle(
+            startActive = formState.startActive,
+            onToggle = { a -> onFormUpdate { copy(startActive = a) } },
             modifier = Modifier
-                .fillMaxWidth(.9f)
-                .aspectRatio(4 / 3f),
-            shape = MaterialShapes.SemiCircle.toShape(),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            tonalElevation = 6.dp,
-            shadowElevation = 6.dp
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    Icons.Default.MoreHoriz,
-                    contentDescription = "Presets",
-                    modifier = Modifier.fillMaxSize(iPhi * iPhi),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-
-        // Main create button
-        val isFirstClepsydra = LocalSettings.current.isFirstClepsydra
-        FloatingActionButton(
-            onClick = {
-                if (isFirstClepsydra) {
-                    onAction(ClepsydraScreenAction.OnFirstClepsydraCreation)
-                }
-                onAction(createClepsydraAction(formState))
-            },
-            modifier = Modifier.size(sizing.centerButtonSize),
-            shape = RoundedCornerShape((16.dp * sizing.textScale).coerceAtLeast(12.dp)),
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = "Create",
-                modifier = Modifier.size(sizing.iconSize * 1.33f)
-            )
-        }
+                .width(48.dp)
+                .aspectRatio(iPhi)
+        )
+        CreateButtonSection(formState = formState)
     }
 }
 
 // ============================================================================
-// GOAL CARD COMPONENT
+// GOAL CARD — label header (same as your current)
 // ============================================================================
 
-/**
- * Card for displaying and editing Pomodoro goal durations
- */
 @Composable
-private fun ClepsydraScope.GoalCard(
+fun ClepsydraScope.GoalCard(
     label: String,
     duration: Duration,
     onDurationChange: (Duration) -> Unit,
     containerColor: Color,
-    sizing: ResponsiveSizing,
     modifier: Modifier = Modifier
 ) {
     val totalMinutes = duration.inWholeMinutes.toInt()
     val hoursState = rememberTextFieldState((totalMinutes / 60).toString())
     val minutesState = rememberTextFieldState((totalMinutes % 60).toString())
 
-    // Sync state changes to duration
     LaunchedEffect(hoursState.text, minutesState.text) {
         val h = hoursState.text.toString().toIntOrNull() ?: 0
         val m = minutesState.text.toString().toIntOrNull() ?: 0
@@ -399,110 +273,92 @@ private fun ClepsydraScope.GoalCard(
     }
 
     Surface(
-        modifier = modifier.height(sizing.goalCardHeight),
-        shape = RoundedCornerShape((20.dp * sizing.textScale).coerceAtLeast(16.dp)),
+        modifier = modifier.heightIn(min = TAP),
+        shape = RoundedCornerShape(20.dp),
         color = containerColor.copy(alpha = 0.12f),
         border = BorderStroke(1.dp, containerColor.copy(alpha = 0.25f)),
         tonalElevation = 0.dp
     ) {
-        Column (
-            modifier = Modifier.padding(horizontal = (12.dp * sizing.textScale).coerceAtLeast(8.dp)),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Column(
+            modifier = Modifier.padding(horizontal = PAD_INNER_H, vertical = PAD_INNER_V),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            GoalLabel(label, containerColor, TextAlign.Center)
-
-            GoalTimeFields(
-                hoursState = hoursState,
-                minutesState = minutesState,
-                containerColor = containerColor,
-                sizing = sizing,
-                modifier = Modifier.weight(1f, false)
+            ElevatedCard(colors = CardDefaults.elevatedCardColors(CardDefaults.elevatedCardColors().containerColor.copy(alpha = 0.7f))) {
+            Text(
+                text = label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 7.sp,
+                fontWeight = FontWeight.Black,
+                color = containerColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(2.dp)
             )
+                }
 
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                DurationTextField(hoursState, containerColor, label = "h", maxValue = 24)
+                Text(":", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = containerColor.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(horizontal = 2.dp))
+                DurationTextField(minutesState, containerColor, label = "m", maxValue = 59)
+            }
         }
     }
 }
 
-@Composable
-private fun GoalLabel(
-    label: String,
-    containerColor: Color,
-    textAlign: TextAlign,
-) {
-    Text(
-        text = label.uppercase(),
-        style = MaterialTheme.typography.labelSmall.copy(textAlign = textAlign),
-        autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, stepSize = 0.001.sp),
-        fontWeight = FontWeight.Black,
-        maxLines = 1,
-        color = containerColor,
-        modifier = Modifier.fillMaxWidth(iPhi*iPhi)
-    )
-}
+// ============================================================================
+// CREATE BUTTONS
+// ============================================================================
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ClepsydraScope.GoalTimeFields(
-    hoursState: TextFieldState,
-    minutesState: TextFieldState,
-    containerColor: Color,
-    sizing: ResponsiveSizing,
+private fun ClepsydraScope.CreateButtonSection(
+    formState: InputClepsydraFormState,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-        modifier = modifier
+    Column(
+        modifier = modifier.wrapContentWidth(Alignment.CenterHorizontally),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(-GAP-3.dp)
     ) {
-        val separator = @Composable {
-            Text(
-                text = ":",
-                style = MaterialTheme.typography.bodyLarge,
-                fontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * sizing.textScale).sp,
-                fontWeight = FontWeight.Bold,
-                color = containerColor.copy(alpha = 0.6f),
-                modifier = Modifier.padding(horizontal = (4.dp * sizing.textScale).coerceAtLeast(2.dp))
-            )
+        Surface(
+            onClick = { },
+            modifier = Modifier.size(48.dp),
+            shape = MaterialShapes.SemiCircle.toShape(),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            tonalElevation = 6.dp,
+            shadowElevation = 6.dp
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.MoreHoriz, contentDescription = "Presets", modifier = Modifier.size(ICON),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
         }
 
-        val fieldWidth = (42.dp * sizing.textScale).coerceAtLeast(32.dp)
-
-
-        DurationTextField(
-            state = hoursState,
-            containerColor = containerColor,
-            label = "h",
-            maxValue = 24,
-            sizing = sizing,
-            modifier = Modifier.width(fieldWidth)
-        )
-        separator()
-
-
-        DurationTextField(
-            state = minutesState,
-            containerColor = containerColor,
-            label = "m",
-            maxValue = 59,
-            sizing = sizing,
-            modifier = Modifier.width(fieldWidth)
-        )
+        val isFirstClepsydra = LocalSettings.current.isFirstClepsydra
+        FloatingActionButton(
+            onClick = {
+                if (isFirstClepsydra) onAction(ClepsydraScreenAction.OnFirstClepsydraCreation)
+                onAction(createClepsydraAction(formState))
+            },
+            modifier = Modifier.size(FAB),
+            shape = RoundedCornerShape(16.dp),
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Create", modifier = Modifier.size(24.dp))
+        }
     }
 }
 
 // ============================================================================
-// START MODE TOGGLE
+// START MODE TOGGLE — slim + animated indicator (restored vibe)
 // ============================================================================
 
-/**
- * Compact toggle between Active and Passive start modes - matches goal card height
- */
 @Composable
 private fun ClepsydraScope.StartModeToggle(
     startActive: Boolean,
     onToggle: (Boolean) -> Unit,
-    sizing: ResponsiveSizing,
     modifier: Modifier = Modifier
 ) {
     val activeColor = MaterialTheme.colorScheme.primaryContainer
@@ -510,106 +366,75 @@ private fun ClepsydraScope.StartModeToggle(
 
     val backgroundColor by animateColorAsState(
         targetValue = if (startActive) activeColor else passiveColor,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-        label = "backgroundColor"
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+        label = "toggleBg"
     )
 
-    val indicatorOffset by animateFloatAsState(
-        targetValue = if (startActive) -1f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "indicatorOffset"
-    )
-
+    // “Cool” motion: bouncy indicator slide between halves
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape((20.dp * sizing.textScale).coerceAtLeast(16.dp)),
+        shape = RoundedCornerShape(20.dp),
         color = backgroundColor.copy(alpha = 0.12f),
-        border = BorderStroke(
-            width = 1.dp,
-            color = backgroundColor.copy(alpha = 0.25f)
-        ),
+        border = BorderStroke(1.dp, backgroundColor.copy(alpha = 0.25f)),
         tonalElevation = 0.dp
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Sliding indicator background
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .fillMaxHeight(0.46f)
-                    .align(Alignment.Center)
-                    .graphicsLayer {
-                        val offsetAmount = size.height / 2
-                        translationY = offsetAmount*indicatorOffset
-                    }
-                    .background(
-                        color = backgroundColor,
-                        shape = RoundedCornerShape((16.dp * sizing.textScale).coerceAtLeast(12.dp))
-                    )
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val half = maxHeight / 2
+
+            val indicatorY by animateDpAsState(
+                targetValue = if (startActive) 0.dp else half,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                ),
+                label = "indicatorY"
             )
 
-            // Toggle options
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly
-            ) {
-                // Active option
+            // moving indicator
+            Box(
+                modifier = Modifier
+                    .offset(y = indicatorY)
+                    .height(half)
+                    .fillMaxSize()
+                    .background(backgroundColor, RoundedCornerShape(16.dp))
+            )
+
+            Column(Modifier.fillMaxSize()) {
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                        .height(half)
+                        .fillMaxSize()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) { onToggle(true) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = sizing.spacing / 2)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Active",
-                            tint = if (startActive)
-                                contentColorFor(activeColor)
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            modifier = Modifier.size(sizing.smallIconSize)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Active",
+                        tint = if (startActive) contentColorFor(activeColor)
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                        modifier = Modifier.size(ICON)
+                    )
                 }
-
-                // Passive option
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                        .height(half)
+                        .fillMaxSize()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) { onToggle(false) },
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = sizing.spacing / 2)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Pause,
-                            contentDescription = "Passive",
-                            tint = if (!startActive)
-                                contentColorFor(passiveColor)
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            modifier = Modifier.size(sizing.smallIconSize)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Pause,
+                        contentDescription = "Passive",
+                        tint = if (!startActive) contentColorFor(passiveColor)
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                        modifier = Modifier.size(ICON)
+                    )
                 }
             }
         }
@@ -617,12 +442,9 @@ private fun ClepsydraScope.StartModeToggle(
 }
 
 // ============================================================================
-// TIME PICKER COMPONENT
+// TIME PICKER + DISPLAY (unchanged from your current version except: make 2-row more eager when isNarrow)
 // ============================================================================
 
-/**
- * Time picker with three modes: NONE, DURATION, and TIMESTAMP
- */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ClepsydraScope.ClepsydraTimePicker(
@@ -633,47 +455,46 @@ private fun ClepsydraScope.ClepsydraTimePicker(
     timeMark: TimeMark?,
     onTimeChanged: (Duration?, Duration?, Duration?, TimeMark?) -> Unit,
     isTowardsLeft: Boolean,
-    sizing: ResponsiveSizing,
+    maxWidth: Dp,
     modifier: Modifier = Modifier
 ) {
     var mode by remember { mutableStateOf(TimeInputMode.NONE) }
-    val hoursState = rememberTextFieldState(
-        hours?.toInt(DurationUnit.HOURS).toString().replace("null", "00")
-    )
-    val minutesState = rememberTextFieldState(
-        minutes?.toInt(DurationUnit.MINUTES).toString().replace("null", "00")
-    )
-    val secondsState = rememberTextFieldState(
-        seconds?.toInt(DurationUnit.SECONDS).toString().replace("null", "00")
-    )
+
+    val hoursState = rememberTextFieldState(hours?.toInt(DurationUnit.HOURS)?.toString() ?: "00")
+    val minutesState = rememberTextFieldState(minutes?.toInt(DurationUnit.MINUTES)?.toString() ?: "00")
+    val secondsState = rememberTextFieldState(seconds?.toInt(DurationUnit.SECONDS)?.toString() ?: "00")
+
     val timePickerState = rememberTimePickerState()
     var showTimePickerDialog by remember { mutableStateOf(false) }
 
-    // Sync mode changes to parent
-    TimePickerModeSync(
-        mode = mode,
-        hoursState = hoursState,
-        minutesState = minutesState,
-        secondsState = secondsState,
-        timePickerState = timePickerState,
-        onTimeChanged = onTimeChanged
-    )
+    TimePickerModeSync(mode, hoursState, minutesState, secondsState, timePickerState, onTimeChanged)
 
     Column(
-        modifier = modifier,
-        horizontalAlignment = if (isTowardsLeft) Alignment.End else Alignment.Start
+        modifier = modifier.widthIn(max = maxWidth).padding(bottom = GAP),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        TimePickerLabel(label, mode, sizing)
+        Text(
+            text = label + when (mode) {
+                TimeInputMode.NONE -> " not set"
+                TimeInputMode.DURATION -> " in"
+                TimeInputMode.TIMESTAMP -> " at"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = LABEL_SP,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
 
-        Spacer(modifier = Modifier.height(sizing.spacing / 2))
+        Spacer(modifier = Modifier.height(2.dp))
+
+        val rowWidth = maxWidth.coerceAtLeast(TAP * 2 + GAP)
+        val displayW = (rowWidth - TAP - GAP).coerceAtLeast(TAP)
 
         Row(
-            modifier = Modifier.height(sizing.timePickerMaxHeight),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier,
+            verticalAlignment = Alignment.Bottom,
             horizontalArrangement = if (isTowardsLeft) Arrangement.End else Arrangement.Start
         ) {
-            val buttonSize = sizing.centerButtonSize * 0.85f
-
             if (isTowardsLeft) {
                 TimeDisplay(
                     mode = mode,
@@ -683,30 +504,21 @@ private fun ClepsydraScope.ClepsydraTimePicker(
                     timePickerState = timePickerState,
                     onShowTimePicker = { showTimePickerDialog = true },
                     isTowardsLeft = true,
-                    sizing = sizing,
-                    modifier = Modifier.weight(1f, false).fillMaxHeight()
+                    modifier = Modifier
                 )
-                if (mode != TimeInputMode.NONE) {
-                    Spacer(modifier = Modifier.width(sizing.spacing))
-                }
                 ThreeModalButton(
-                    modifier = Modifier.size(buttonSize),
+                    modifier = Modifier.size(48.dp),
                     isTowardsLeft = true,
                     onClick = { mode = mode.next() },
-                    modes = mode,
-                    sizing = sizing
+                    modes = mode
                 )
             } else {
                 ThreeModalButton(
-                    modifier = Modifier.size(buttonSize),
+                    modifier = Modifier.size(48.dp),
                     isTowardsLeft = false,
                     onClick = { mode = mode.next() },
-                    modes = mode,
-                    sizing = sizing
+                    modes = mode
                 )
-                if (mode != TimeInputMode.NONE) {
-                    Spacer(modifier = Modifier.width(sizing.spacing))
-                }
                 TimeDisplay(
                     mode = mode,
                     hoursState = hoursState,
@@ -715,8 +527,7 @@ private fun ClepsydraScope.ClepsydraTimePicker(
                     timePickerState = timePickerState,
                     onShowTimePicker = { showTimePickerDialog = true },
                     isTowardsLeft = false,
-                    sizing = sizing,
-                    modifier = Modifier.weight(1f, false).fillMaxHeight()
+                    modifier = Modifier
                 )
             }
         }
@@ -731,22 +542,6 @@ private fun ClepsydraScope.ClepsydraTimePicker(
     }
 }
 
-@Composable
-private fun TimePickerLabel(label: String, mode: TimeInputMode, sizing: ResponsiveSizing) {
-    val suffix = when (mode) {
-        TimeInputMode.NONE -> " not set"
-        TimeInputMode.DURATION -> " in"
-        TimeInputMode.TIMESTAMP -> " at"
-    }
-    Text(
-        text = label + suffix,
-        style = MaterialTheme.typography.labelSmall,
-        fontSize = (MaterialTheme.typography.labelSmall.fontSize.value * sizing.textScale).sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontWeight = FontWeight.Medium
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimePickerModeSync(
@@ -759,43 +554,22 @@ private fun TimePickerModeSync(
 ) {
     LaunchedEffect(mode) {
         when (mode) {
-            TimeInputMode.NONE -> {
-                onTimeChanged(null, null, null, null)
-            }
+            TimeInputMode.NONE -> onTimeChanged(null, null, null, null)
             TimeInputMode.DURATION -> {
-                snapshotFlow {
-                    Triple(
-                        hoursState.text.toString(),
-                        minutesState.text.toString(),
-                        secondsState.text.toString()
-                    )
-                }.collect { (h, m, s) ->
-                    onTimeChanged(
-                        h.toIntOrNull()?.hours,
-                        m.toIntOrNull()?.minutes,
-                        s.toIntOrNull()?.seconds,
-                        null
-                    )
-                }
+                snapshotFlow { Triple(hoursState.text.toString(), minutesState.text.toString(), secondsState.text.toString()) }
+                    .collect { (h, m, s) ->
+                        onTimeChanged(h.toIntOrNull()?.hours, m.toIntOrNull()?.minutes, s.toIntOrNull()?.seconds, null)
+                    }
             }
             TimeInputMode.TIMESTAMP -> {
                 snapshotFlow { timePickerState.hour to timePickerState.minute }
                     .collect { (h, m) ->
-                        onTimeChanged(
-                            null,
-                            null,
-                            null,
-                            (h * 60 + m).minutes.asTimeMarkFromStartOfDay()
-                        )
+                        onTimeChanged(null, null, null, (h * 60 + m).minutes.asTimeMarkFromStartOfDay())
                     }
             }
         }
     }
 }
-
-// ============================================================================
-// TIME DISPLAY COMPONENT
-// ============================================================================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -807,31 +581,22 @@ private fun ClepsydraScope.TimeDisplay(
     timePickerState: TimePickerState,
     onShowTimePicker: () -> Unit,
     isTowardsLeft: Boolean,
-    sizing: ResponsiveSizing,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        AnimatedContent(
-            targetState = mode,
-            label = "TimeDisplay"
-        ) { currentMode ->
+        AnimatedContent(targetState = mode, label = "TimeDisplay") { currentMode ->
             when (currentMode) {
-                TimeInputMode.NONE -> Box(modifier = Modifier.fillMaxSize())
+                TimeInputMode.NONE -> Box {}
                 TimeInputMode.DURATION -> {
-                    DurationTimeDisplay(
+                    DurationTimeDisplayResponsive(
                         hoursState = hoursState,
                         minutesState = minutesState,
                         secondsState = secondsState,
-                        isTowardsLeft = isTowardsLeft,
-                        sizing = sizing
+                        isTowardsLeft = isTowardsLeft
                     )
                 }
                 TimeInputMode.TIMESTAMP -> {
-                    TimestampDisplay(
-                        timePickerState = timePickerState,
-                        onShowTimePicker = onShowTimePicker,
-                        sizing = sizing
-                    )
+                    TimestampDisplay(timePickerState, onShowTimePicker)
                 }
             }
         }
@@ -839,122 +604,96 @@ private fun ClepsydraScope.TimeDisplay(
 }
 
 @Composable
-private fun ClepsydraScope.DurationTimeDisplay(
+private fun ClepsydraScope.DurationTimeDisplayResponsive(
     hoursState: TextFieldState,
     minutesState: TextFieldState,
     secondsState: TextFieldState,
-    isTowardsLeft: Boolean,
-    sizing: ResponsiveSizing
+    isTowardsLeft: Boolean
 ) {
     var showHours by remember { mutableStateOf(false) }
     var showSeconds by remember { mutableStateOf(false) }
 
     Surface(
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
-        shape = RoundedCornerShape((16.dp * sizing.textScale).coerceAtLeast(12.dp)),
+        shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
+        modifier = Modifier
     ) {
-        Row(
-            horizontalArrangement = if (isTowardsLeft) Arrangement.End else Arrangement.Start,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = (4.dp * sizing.textScale).coerceAtLeast(2.dp))
-        ) {
-            DurationFieldOrToggle(
-                isVisible = showHours,
-                onToggle = { showHours = !showHours },
-                state = hoursState,
-                label = "h",
-                sizing = sizing,
-                modifier = Modifier.weight(1f, false)
-            )
+        BoxWithConstraints(Modifier) {
+            val tooNarrowForSingleRow = isNarrow || maxWidth < (TAP * 3 + 20.dp)
 
-            Box(
-                modifier = Modifier.weight(1f, false).padding(horizontal = (4.dp * sizing.textScale).coerceAtLeast(2.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                DurationTextField(
-                    label = "m",
-                    state = minutesState,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    maxValue = 59,
-                    sizing = sizing
-                )
-            }
-
-            DurationFieldOrToggle(
-                isVisible = showSeconds,
-                onToggle = { showSeconds = !showSeconds },
-                state = secondsState,
-                label = "s",
-                sizing = sizing,
-                modifier = Modifier.weight(1f, false)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ClepsydraScope.DurationFieldOrToggle(
-    isVisible: Boolean,
-    onToggle: () -> Unit,
-    state: TextFieldState,
-    label: String,
-    sizing: ResponsiveSizing,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (isVisible) {
-            if (label != "h") {
-                Text(
-                    text = " : ",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * sizing.textScale).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                DurationTextField(
-                    label = label,
-                    state = state,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    maxValue = if (label == "h") 23 else 59,
-                    sizing = sizing
-                )
-            }
-            if (label == "h") {
-                Text(
-                    text = " : ",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * sizing.textScale).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-
-        } else {
-            val toggleSize = (20.dp * sizing.textScale).coerceAtLeast(16.dp)
-            Surface(
-                onClick = onToggle,
-                modifier = Modifier.size(toggleSize),
-                shape = RoundedCornerShape((6.dp * sizing.textScale).coerceAtLeast(4.dp)),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+            if (tooNarrowForSingleRow) {
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = (10 * sizing.textScale).coerceAtLeast(8f).sp,
-                        fontWeight = FontWeight.Bold
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                        DurationTextField(
+                            state = minutesState,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            label = "m",
+                            maxValue = 59,
+                            modifier = Modifier.size(TAP)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier,
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        DurationTextField(
+                            state = hoursState,
+                            label = "h",
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            maxValue = 23,
+                            modifier = Modifier.size(TAP)
+                        )
+
+                        DurationTextField(
+                            state = secondsState,
+                            label = "s",
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            maxValue = 59,
+                            modifier = Modifier.size(TAP)
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    horizontalArrangement = if (isTowardsLeft) Arrangement.End else Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                ) {
+                    DurationTextField(
+                        state = hoursState,
+                        label = "h",
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        maxValue = 23,
+                        modifier = Modifier.size(TAP)
+                    )
+
+                    Text(":", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 2.dp))
+
+                    DurationTextField(
+                        state = minutesState,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        label = "m",
+                        maxValue = 59,
+                        modifier = Modifier.size(TAP)
+                    )
+
+                    Text(":", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 2.dp))
+
+                    DurationTextField(
+                        state = secondsState,
+                        label = "s",
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        maxValue = 59,
+                        modifier = Modifier.size(TAP)
                     )
                 }
             }
@@ -964,32 +703,21 @@ private fun ClepsydraScope.DurationFieldOrToggle(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TimestampDisplay(
-    timePickerState: TimePickerState,
-    onShowTimePicker: () -> Unit,
-    sizing: ResponsiveSizing
-) {
+private fun ClepsydraScope.TimestampDisplay(timePickerState: TimePickerState, onShowTimePicker: () -> Unit) {
     Surface(
         onClick = onShowTimePicker,
-        modifier = Modifier.wrapContentSize(),
-        shape = RoundedCornerShape((16.dp * sizing.textScale).coerceAtLeast(12.dp)),
+        modifier = Modifier
+            .sizeIn(minWidth = TAP-8.dp, minHeight = TAP-8.dp),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
         tonalElevation = 0.dp
     ) {
-        Box(
-            modifier = Modifier.padding(
-                horizontal = (16.dp * sizing.textScale).coerceAtLeast(12.dp),
-                vertical = (12.dp * sizing.textScale).coerceAtLeast(8.dp)
-            ),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
             Text(
-                text = "At : ${timePickerState.hour.toString().padStart(2, '0')}:${
-                    timePickerState.minute.toString().padStart(2, '0')
-                }",
-                style = MaterialTheme.typography.bodyLarge,
-                fontSize = (MaterialTheme.typography.bodyLarge.fontSize.value * sizing.textScale).sp,
+                text = "At ${timePickerState.hour.toString().padStart(2, '0')}:${timePickerState.minute.toString().padStart(2, '0')}",
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -1008,54 +736,32 @@ private fun ClepsydraScope.TimePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
-            modifier = Modifier
-                .wrapContentWidth()
-                .widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
+            modifier = Modifier.wrapContentWidth().widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             shape = RoundedCornerShape(28.dp)
         ) {
-            Column(
-                modifier = Modifier.adaptivePadding(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Select Time",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 10.dp)
                 )
 
                 TimePicker(state = state)
 
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    modifier = Modifier.wrapContentWidth(Alignment.End).padding(top = 10.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(
-                            text = "Cancel",
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    TextButton(onClick = onConfirm) {
-                        Text(
-                            text = "OK",
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    TextButton(onClick = onDismiss) { Text("Cancel", fontWeight = FontWeight.Medium) }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    TextButton(onClick = onConfirm) { Text("OK", fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -1066,17 +772,13 @@ private fun ClepsydraScope.TimePickerDialog(
 // THREE MODAL BUTTON
 // ============================================================================
 
-/**
- * Button that cycles through three modes with animated shape morphing
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ClepsydraScope.ThreeModalButton(
     modifier: Modifier,
     isTowardsLeft: Boolean,
     onClick: () -> Unit,
-    modes: TimeInputMode,
-    sizing: ResponsiveSizing
+    modes: TimeInputMode
 ) {
     var circle by remember { mutableIntStateOf(if (isTowardsLeft) 180 else 0) }
     var isTransitioning by remember { mutableStateOf(false) }
@@ -1084,22 +786,19 @@ fun ClepsydraScope.ThreeModalButton(
     LaunchedEffect(modes) {
         circle += 120 * (if (isTowardsLeft) -1 else 1)
         isTransitioning = true
-        delay(250)
+        delay(200)
         isTransitioning = false
     }
 
     val angle by animateIntAsState(
         targetValue = circle,
-        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
         label = "angle"
     )
 
     val scale by animateFloatAsState(
-        targetValue = if (isTransitioning) 1.5f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        targetValue = if (isTransitioning) 1.25f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "scale"
     )
 
@@ -1116,34 +815,17 @@ fun ClepsydraScope.ThreeModalButton(
     }
 
     Surface(
-        modifier = modifier.graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        },
+        modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .sizeIn(minWidth = TAP, minHeight = TAP),
         onClick = onClick,
         color = containerColor,
         shape = MaterialShapes.Triangle.toShape(angle),
         shadowElevation = 6.dp,
         tonalElevation = 6.dp
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(iPhi),
-            contentAlignment = if (isTowardsLeft) Alignment.CenterEnd else Alignment.CenterStart
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val iconPadding = (7.dp * sizing.textScale).coerceAtLeast(5.dp)
-                Spacer(Modifier.width(iconPadding + if (!isTowardsLeft) (4.dp * sizing.textScale).coerceAtLeast(2.dp) else 0.dp))
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(sizing.smallIconSize),
-                    tint = contentColorFor(containerColor)
-                )
-                Spacer(Modifier.width(iconPadding + if (isTowardsLeft) (4.dp * sizing.textScale).coerceAtLeast(2.dp) else 0.dp))
-            }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(ICON), tint = contentColorFor(containerColor))
         }
     }
 }
@@ -1152,144 +834,148 @@ fun ClepsydraScope.ThreeModalButton(
 // DURATION TEXT FIELD
 // ============================================================================
 
-/**
- * Interactive text field for duration input with scroll and drag gestures
- */
 @Composable
 fun ClepsydraScope.DurationTextField(
     state: TextFieldState,
     containerColor: Color,
     modifier: Modifier = Modifier,
     label: String = "",
-    maxValue: Int = 99,
-    sizing: ResponsiveSizing = rememberResponsiveSizing()
+    maxValue: Int = 99
 ) {
     val haptic = LocalHapticFeedback.current
-    val currentInt = state.text.toString().toIntOrNull() ?: 0
+    val density = LocalDensity.current
+    val focusRequester = remember { FocusRequester() }
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val bgColor by animateColorAsState(
+        targetValue = if (isPressed) containerColor.copy(alpha = 0.3f) else containerColor.copy(alpha = 0.1f),
+        animationSpec = tween(120),
+        label = "bgColor"
+    )
 
     Box(
         modifier = modifier
-            .aspectRatio(iPhi)
-            .addScrollGesture { direction ->
-                updateDurationValue(state, direction, maxValue, haptic)
+            .size(TAP)
+            .background(bgColor, RoundedCornerShape(8.dp))
+            .focusRequester(focusRequester)
+            .focusable()
+            .clickable(interactionSource = interactionSource, indication = null) { focusRequester.requestFocus() }
+            .drawWithContent {
+                drawContent()
+                with(density) {
+                    drawLine(
+                        color = containerColor,
+                        start = Offset(size.width * 0.20f, size.height),
+                        end = Offset(size.width * 0.80f, size.height),
+                        strokeWidth = 2.dp.toPx()
+                    )
+                }
             }
-            .addDragGesture { direction ->
-                updateDurationValue(state, direction, maxValue, haptic)
-            },
+            .addScrollGesture { dir -> updateDurationValue(state, dir, maxValue, haptic) }
+            .addDragGesture { dir -> updateDurationValue(state, dir, maxValue, haptic) },
         contentAlignment = Alignment.Center
     ) {
+        val currentInt = state.text.toString().toIntOrNull() ?: 0
+
         Column(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            GhostNumber(currentInt + 1, maxValue, fadeFromTop = true, modifier = Modifier.weight(iPhi))
 
-            GhostNumber(
-                value = currentInt + 1,
-                maxValue = maxValue,
-                fadeFromTop = true,
-                sizing = sizing,
-                modifier = Modifier.weight(iPhi)
+            BasicTextField(
+                state = state,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                lineLimits = TextFieldLineLimits.SingleLine,
+                inputTransformation = InputTransformation.maxLength(2).then {
+                    val txt = asCharSequence()
+                    if (!txt.all { it.isDigit() }) revertAllChanges()
+                    val num = txt.toString().toIntOrNull()
+                    if (num != null && num > maxValue) replace(0, txt.length, maxValue.toString().padStart(2, '0'))
+                },
+                outputTransformation = OutputTransformation { },
+                textStyle = TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    fontSize = 10.sp*fluidScale,
+                    color = contentColorFor(containerColor)
+                ),
+                modifier = Modifier.weight(1f).fillMaxSize(),
+                decorator = { inner -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { inner() } }
             )
 
-
-            Box(modifier = Modifier, contentAlignment = Alignment.Center) {
-                BasicTextField(
-                    state = state,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    lineLimits = TextFieldLineLimits.SingleLine,
-                    inputTransformation = InputTransformation.maxLength(2).then {
-                        if (!asCharSequence().all { it.isDigit() }) revertAllChanges()
-                    },
-                    outputTransformation = OutputTransformation {
-                        this.append(" $label")
-                    },
-                    textStyle = TextStyle(
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        fontSize = (14 * sizing.textScale).coerceAtLeast(11f).sp,
-                        color = contentColorFor(containerColor),
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    decorator = { it() }
-                )
-            }
-
-            GhostNumber(
-                value = currentInt - 1,
-                maxValue = maxValue,
-                fadeFromTop = false,
-                sizing = sizing,
-                modifier = Modifier.weight(iPhi)
-            )
-
+            GhostNumber(currentInt - 1, maxValue, fadeFromTop = false, modifier = Modifier.weight(iPhi))
         }
+
+        Text(
+            text = label,
+            fontSize = 9.sp*fluidScale,
+            fontWeight = FontWeight.Black,
+            color = containerColor.copy(alpha = 0.95f),
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp)
+        )
     }
 }
 
 @Composable
-private fun GhostNumber(
+private fun ClepsydraScope.GhostNumber(
     value: Int,
     maxValue: Int,
     fadeFromTop: Boolean,
-    sizing: ResponsiveSizing,
     modifier: Modifier = Modifier
 ) {
     val displayValue = value.coerceIn(0, maxValue)
     val shouldShow = if (fadeFromTop) value <= maxValue else value >= 0
 
-    Box(
-        modifier = modifier,
-        contentAlignment = if (fadeFromTop) Alignment.BottomCenter else Alignment.TopCenter
-    ) {
-        if (shouldShow) {
-            Text(
-                displayValue.toString().padStart(2, '0'),
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = (10 * sizing.textScale).coerceAtLeast(8f).sp,
-                modifier = Modifier.applyFadeGradient(fadeFromTop)
-            )
-        }
+
+    Box(modifier = modifier, contentAlignment = if(fadeFromTop) Alignment.BottomCenter else Alignment.TopCenter) {
+        if (!shouldShow) return
+        Text(
+            text = displayValue.toString().padStart(2, '0'),
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 8.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+            modifier = Modifier.applyFadeGradient(fadeFromTop)
+        )
     }
 }
 
 // ============================================================================
-// HELPER FUNCTIONS & EXTENSIONS
+// HELPERS
 // ============================================================================
 
-private fun Modifier.addScrollGesture(
-    onScroll: (direction: Int) -> Unit
-): Modifier = this.pointerInput(Unit) {
-    awaitPointerEventScope {
-        while (true) {
-            val event = awaitPointerEvent()
-            if (event.type == PointerEventType.Scroll) {
-                val direction = if (event.changes.first().scrollDelta.y < 0) 1 else -1
-                onScroll(direction)
+private fun Modifier.addScrollGesture(onScroll: (direction: Int) -> Unit): Modifier =
+    this.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if (event.type == PointerEventType.Scroll) {
+                    val direction = if (event.changes.first().scrollDelta.y < 0) 1 else -1
+                    onScroll(direction)
+                }
             }
         }
     }
-}
 
-private fun Modifier.addDragGesture(
-    onDrag: (direction: Int) -> Unit
-): Modifier = this.pointerInput(Unit) {
-    var drag = 0f
-    detectVerticalDragGestures(
-        onDragEnd = { drag = 0f }
-    ) { change, amount ->
-        change.consume()
-        drag += amount
-        if (abs(drag) > 30f) {
-            val direction = if (drag < 0) 1 else -1
-            onDrag(direction)
-            drag = 0f
+private fun Modifier.addDragGesture(onDrag: (direction: Int) -> Unit): Modifier =
+    this.pointerInput(Unit) {
+        var drag = 0f
+        detectVerticalDragGestures(onDragEnd = { drag = 0f }) { change, amount ->
+            change.consume()
+            drag += amount
+            if (abs(drag) > 30f) {
+                val direction = if (drag < 0) 1 else -1
+                onDrag(direction)
+                drag = 0f
+            }
         }
     }
-}
 
-private fun Modifier.applyFadeGradient(fadeFromTop: Boolean): Modifier {
-    return this
+private fun Modifier.applyFadeGradient(fadeFromTop: Boolean): Modifier =
+    this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
@@ -1310,7 +996,6 @@ private fun Modifier.applyFadeGradient(fadeFromTop: Boolean): Modifier {
             }
             drawRect(brush = fadeOverlay, blendMode = BlendMode.DstIn)
         }
-}
 
 private fun updateDurationValue(
     state: TextFieldState,
@@ -1322,9 +1007,7 @@ private fun updateDurationValue(
     val newVal = (currentVal + increment).coerceIn(0, maxValue)
     if (newVal != currentVal) {
         haptic?.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        state.edit {
-            replace(0, length, newVal.toString().padStart(2, '0'))
-        }
+        state.edit { replace(0, length, newVal.toString().padStart(2, '0')) }
     }
 }
 

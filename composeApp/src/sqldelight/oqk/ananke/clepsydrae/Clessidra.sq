@@ -15,6 +15,8 @@ CREATE TABLE clepsydra (
     fin INTEGER
 );
 
+CREATE INDEX idx_init_time ON clepsydra(init_time);
+
 insertClepsydra:
 INSERT INTO clepsydra(name, note, tags, init_time, last_state_change, total_active_time, total_passive_time, is_active, ended, session_id, pomodoro_active, pomodoro_passive, fin)
 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

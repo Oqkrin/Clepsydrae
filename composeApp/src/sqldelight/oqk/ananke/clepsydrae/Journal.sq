@@ -1,0 +1,27 @@
+CREATE TABLE Journal (
+day TEXT NOT NULL,
+init TEXT NOT NULL,
+end TEXT DEFAULT NULL,
+entry TEXT,
+PRIMARY KEY (day, init)
+);
+
+CREATE INDEX idx_journal_end ON Journal(end);
+
+insertEntry:
+INSERT OR IGNORE INTO Journal(day ,init, end, entry)
+VALUES (:day, :init, :end, :entry);
+
+selectJournalOfDay:
+SELECT * FROM Journal WHERE day = :day
+UNION SELECT * FROM  Journal WHERE init >= :startOfDay AND init < :endOfDay
+UNION SELECT * FROM  Journal WHERE end >= :startOfDay AND end < :endOfDay;
+
+updateEntry:
+UPDATE OR IGNORE Journal SET
+end = :end,
+entry = :entry
+WHERE day = :day AND init = :init;
+
+deleteEntry:
+DELETE FROM Journal WHERE day = :day AND init = :init;

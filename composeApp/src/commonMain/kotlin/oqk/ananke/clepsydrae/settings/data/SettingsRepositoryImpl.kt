@@ -1,6 +1,5 @@
 package oqk.ananke.clepsydrae.settings.data
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +20,7 @@ class SettingsRepositoryImpl(private val database: Database) : SettingsRepositor
             isFirstClepsydra = settings?.isFirstClepsydra?.toBool() ?: true,
             isDarkTheme = settings?.isDarkTheme?.toBool() ?: false,
             theme = settings?.theme ?: "rain",
-            fontSize = settings?.fontSize?.toInt() ?: 14,
+            fontSize = settings?.fontSize?.toInt() ?: 1,
             uiScale = settings?.uiScale?.toFloat() ?: 1.0f
         )
     }

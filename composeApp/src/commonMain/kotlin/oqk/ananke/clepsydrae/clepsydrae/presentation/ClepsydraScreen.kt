@@ -1,6 +1,7 @@
 package oqk.ananke.clepsydrae.clepsydrae.presentation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Alignment
@@ -38,14 +40,31 @@ import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.UtcOffset
+import kotlinx.datetime.asTimeSource
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.format
+import kotlinx.datetime.format.DateTimeComponents
+import kotlinx.datetime.format.DateTimeFormat
+import kotlinx.datetime.toDateTimePeriod
+import kotlinx.datetime.todayIn
+import oqk.ananke.clepsydrae.clepsydrae.data.toEpochMillis
+import oqk.ananke.clepsydrae.clepsydrae.data.toTimeMark
+import oqk.ananke.clepsydrae.clepsydrae.domain.asText
 import oqk.ananke.clepsydrae.clepsydrae.domain.dts
 import oqk.ananke.clepsydrae.clepsydrae.domain.shouldNotifyPomodoro
 import oqk.ananke.clepsydrae.clepsydrae.domain.strlapsed
 import oqk.ananke.clepsydrae.core.*
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.time.inMs
+import java.time.Clock
 import kotlin.math.sqrt
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.TimeSource
 
 interface ClepsydraScope : ScreenScope<ClepsydraScreenState, ClepsydraScreenAction>
 
@@ -133,6 +152,14 @@ fun ClepsydraScreen(navController: NavController) {
                         }
                     }
 
+                    Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(BottomAppBarDefaults.FlexibleBottomAppBarHeight).debugBorder(), horizontalArrangement = Arrangement.SpaceBetween) {
+
+                        Column {
+                            ClepsydraTimeBar()
+                        }
+
+                    }
+
                         st.currentClepsydra?.let {
 
                             MorphingTimer(Modifier.align(Alignment.Center))
@@ -145,15 +172,98 @@ fun ClepsydraScreen(navController: NavController) {
                             ) {
                                 Icon(Icons.Default.Close, "Close")
                             }
-                        } ?: ClepsydraInputForm(modifier = Modifier.align(Alignment.BottomCenter))
+                        } ?: ClepsydraInputFormV2(modifier = Modifier.align(Alignment.BottomCenter))
 
 
                     if (st.showHistory) HistoryList()
+
+
+
                 }
+
+
+
             }
         }
     }
 }
+
+@Composable
+fun ClepsydraScope.ClepsydraInputFormV2(modifier: Modifier) {
+}
+
+@OptIn(ExperimentalTime::class)
+@Composable
+fun ClepsydraScope.ClepsydraTimeBar(
+    modifier: Modifier = Modifier
+) {
+    // Read current clepsydra from your state holder
+    val current = st.currentClepsydra
+
+    // ====== 1) CLOCK — current local time as "HH:mm:ss" ======
+    var nowText by remember { mutableStateOf("--:--:--") }
+
+    LaunchedEffect(Unit) {
+        // Update once per second
+        while (true) {
+            nowText = kotlin.time.Clock.System.todayIn(TimeZone.currentSystemDefault()).atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds().toTimeMark().elapsedNow().asText()
+            delay(1.seconds)
+        }
+    }
+
+    // ====== 2) PROGRESS — only when there's a bounded end ======
+    // progress in [0f, 1f], or null if not applicable
+    val progress: Float? by produceState<Float?>(initialValue = null, current) {
+        if (current?.fin != null) {
+            while (true) {
+                val total = current.fin.elapsedNow().inMs.toFloat()
+                val elapsed = current.init.elapsedNow().inMs.toFloat()
+                value = total / elapsed
+                delay(500.milliseconds) // smoother than 1s without being heavy
+            }
+        } else {
+            value = null
+        }
+    }
+
+    val barColor by animateColorAsState(
+        targetValue = if (current?.isActive == true)
+            MaterialTheme.colorScheme.primary
+        else
+            MaterialTheme.colorScheme.secondary,
+        animationSpec = tween(300),
+        label = "timeBarColor"
+    )
+
+    ExtendedFloatingActionButton(onClick = { onAction(ClepsydraScreenAction.OnCreateNoteAtTime(nowText)) } ) {
+        Column(
+            modifier = modifier.adaptivePadding(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Current time (centered)
+            Text(
+                text = nowText,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Show progress bar only if we have a current clepsydra with an end
+            if (progress != null) {
+                LinearProgressIndicator(
+                    progress = { progress!!.coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp),
+                    color = barColor,
+                    trackColor = barColor.copy(alpha = 0.18f),
+                    strokeCap = ProgressIndicatorDefaults.LinearStrokeCap
+                )
+            }
+        }
+    }
+}
+
 
 
 @Composable
@@ -354,8 +464,10 @@ data class Droplet(val progress: Float, val x: Float, val speed: Float, val size
 
 @Composable
 fun ClepsydraScope.WaterDroplets() {
+    val timerActive = MaterialTheme.colorScheme.primary
+    val timerInactive = MaterialTheme.colorScheme.secondary
     val color by remember(st.currentClepsydra?.isActive) {
-        derivedStateOf { if (st.currentClepsydra?.isActive == true) TimerActive else TimerInactive }
+        derivedStateOf { if (st.currentClepsydra?.isActive == true) timerActive else timerInactive }
     }
     var droplets by remember { mutableStateOf(listOf<Droplet>()) }
     val isActive = st.currentClepsydra?.isActive == true

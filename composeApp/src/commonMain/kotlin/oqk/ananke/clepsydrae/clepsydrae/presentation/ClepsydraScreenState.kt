@@ -12,5 +12,6 @@ data class ClepsydraScreenState(
     val showHistory: Boolean = false,
     val showNameDialog: Boolean = false,
     val pomodoroNotifying: Boolean = false,
-    val showNotificationPermissionPopUp: Boolean = false
+    val showNotificationPermissionPopUp: Boolean = false,
+    val showNoteDialog: Pair<Boolean, String> = false to ""
 )

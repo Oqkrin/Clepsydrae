@@ -181,6 +181,10 @@ class ClepsydraScreenViewModel(
                     _state.update { it.copy(pomodoroNotifying = false) }
                 }
             }
+
+            is ClepsydraScreenAction.OnCreateNoteAtTime -> {
+                _state.update { it.copy(showNoteDialog = true to action.time) }
+            }
         }
     }
 }

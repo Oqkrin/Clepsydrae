@@ -88,7 +88,7 @@ interface ScreenScope<S, A> {
      * based on the window's smallest dimension.
      */
     val fluidScale: Float get() {
-        val minDim = sizes.min()
+        val minDim = (sizes.width + sizes.height)/2
         return when {
             minDim < 600.dp -> 1f
             minDim < 840.dp -> lerp(1f.dp, 2f.dp, (minDim - 600.dp) / (840.dp - 600.dp)).value

@@ -9,6 +9,8 @@ import oqk.ananke.clepsydrae.core.AndroidNotificationManager
 import oqk.ananke.clepsydrae.core.DriverFactory
 import oqk.ananke.clepsydrae.core.NotificationManager
 import oqk.ananke.clepsydrae.core.createDatabase
+import oqk.ananke.clepsydrae.journal.data.JournalRepositoryImpl
+import oqk.ananke.clepsydrae.journal.domain.JournalRepository
 import oqk.ananke.clepsydrae.settings.data.SettingsRepositoryImpl
 import oqk.ananke.clepsydrae.settings.domain.SettingsRepository
 import oqk.ananke.clepsydrae.settings.presentation.SettingsScreenViewModel
@@ -18,6 +20,7 @@ actual fun platformModule(notificationManager: NotificationManager) = module {
     single { createDatabase(get()) }
     single<SettingsRepository> { SettingsRepositoryImpl(get()) }
     single<ClepsydraRepository> { ClepsydraRepositoryImpl(get()) }
+    single<JournalRepository> { JournalRepositoryImpl(get()) }
     single<NotificationManager> { notificationManager }
     factory { ClepsydraScreenViewModel(
         clepsydraRepository = get(),

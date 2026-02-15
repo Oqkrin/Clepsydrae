@@ -28,6 +28,7 @@ sealed interface ClepsydraScreenAction {
         val startActive: Boolean = presetClepsydra?.isActive ?: false
     ) : ClepsydraScreenAction
 
+    data class OnCreateNoteAtTime(val time: String): ClepsydraScreenAction
     data object OnFirstClepsydraCreation: ClepsydraScreenAction
     data object OnFirstClepsydraCreationOnResult: ClepsydraScreenAction
     data object OnCreateWithName : ClepsydraScreenAction
