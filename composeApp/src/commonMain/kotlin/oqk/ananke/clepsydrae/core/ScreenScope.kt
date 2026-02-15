@@ -52,7 +52,7 @@ interface ScreenScope<S, A> {
     val adaptiveScale: Float get() = if(isExtraWide) 3f else if(isWide) 2f else 1f
     /** Combined user scale × adaptive scale */
     val effectiveScale: Float get() = uiScale * adaptiveScale
-    
+
     /** Fill max dimension based on orientation */
     fun Modifier.fillMaxSmallest(fraction: Float = 1f): Modifier =
         if (isPortrait) fillMaxWidth(fraction) else fillMaxHeight(fraction)
@@ -101,7 +101,7 @@ interface ScreenScope<S, A> {
 
     /** make square */
     fun Modifier.sq(matchHeightConstraintsFirst: Boolean = false): Modifier = aspectRatio(1f, matchHeightConstraintsFirst)
-    
+
     /** Convert Int to adaptive Dp */
     fun Int.adp(fixedScale: Float = 1f): Dp = this.dp.adaptive(fixedScale)
     /** Apply effective scale to Dp */
