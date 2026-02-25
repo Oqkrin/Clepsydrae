@@ -10,14 +10,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
+import oqk.ananke.clepsydrae.clepsydrae.data.toTimeMark
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.ClepsydraRepository
 import oqk.ananke.clepsydrae.clepsydrae.domain.end
 import oqk.ananke.clepsydrae.clepsydrae.domain.invertiDiatesi
 import oqk.ananke.clepsydrae.core.NotificationManager
-import oqk.ananke.clepsydrae.core.formatDate
+import oqk.ananke.clepsydrae.journal.domain.formatDate
+import oqk.ananke.clepsydrae.journal.domain.JournalRepository
 import oqk.ananke.clepsydrae.settings.domain.SettingsRepository
 import kotlin.let
 import kotlin.time.Clock
@@ -29,6 +32,7 @@ import kotlin.time.TimeSource
 class ClepsydraScreenViewModel(
     private val clepsydraRepository: ClepsydraRepository,
     private val settingsRepository: SettingsRepository,
+    private val journalRepository: JournalRepository,
     private val notificationManager: NotificationManager
     ) : ViewModel() {
     private val _state = MutableStateFlow(ClepsydraScreenState())
@@ -41,15 +45,16 @@ class ClepsydraScreenViewModel(
     @OptIn(ExperimentalTime::class)
     private fun loadClepsydraeForDate() {
         viewModelScope.launch {
-            val date = _state.value.selectedDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
+            val date = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
             val list = clepsydraRepository.getClepsydraeByDate(date)
             val past = list.filter { it.init.elapsedNow() >= Duration.ZERO }
             val future = list.filter { it.init.elapsedNow() < Duration.ZERO }
             _state.update { it.copy(
                 pastClepsydrae = past, 
                 futureClepsydrae = future, 
-                selectedDate = date,
-                dateText = formatDate(date)
+                currentLocalDate = date,
+                dateText = formatDate(date),
+                startOfDay = date.atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds().toTimeMark()
             ) }
         }
     }
@@ -76,8 +81,8 @@ class ClepsydraScreenViewModel(
 
                 val cc: ClepsydraScreenAction.OnCreateClepsydra = action
 
-                state.value.currentClepsydra?.let {
-                    onAction(ClepsydraScreenAction.OnClose)
+                state.value.coreClepsydra?.let {
+                    onAction(ClepsydraScreenAction.OnCloseCoreClepsydra)
                 }
 
                 _state.update {
@@ -89,7 +94,7 @@ class ClepsydraScreenViewModel(
                         .reduceOrNull { acc, d -> acc + d }?.takeIf { value -> value >= Duration.ZERO }
 
                     it.copy(
-                        currentClepsydra =
+                        coreClepsydra =
                         Clepsydra(
                             name = cc.name,
                             note = cc.note,
@@ -103,28 +108,24 @@ class ClepsydraScreenViewModel(
                 }
             }
 
-            is ClepsydraScreenAction.OnCreateWithName -> {
-                _state.update { it.copy(showNameDialog = true) }
-            }
-
-            is ClepsydraScreenAction.OnClose -> {
-                _state.update { it.copy(currentClepsydra = it.currentClepsydra?.end() ) }
+            is ClepsydraScreenAction.OnCloseCoreClepsydra -> {
+                _state.update { it.copy(coreClepsydra = it.coreClepsydra?.end() ) }
 
                 viewModelScope.launch {
-                    if (state.value.currentClepsydra!!.id == null) {
-                        clepsydraRepository.insertClepsydra(state.value.currentClepsydra!!)
+                    if (state.value.coreClepsydra!!.id == null) {
+                        clepsydraRepository.insertClepsydra(state.value.coreClepsydra!!)
                     } else {
-                        clepsydraRepository.updateClepsydra(state.value.currentClepsydra!!)
+                        clepsydraRepository.updateClepsydra(state.value.coreClepsydra!!)
                     }
                     loadClepsydraeForDate()
                 }
 
-                _state.update { it.copy(currentClepsydra = null) }
+                _state.update { it.copy(coreClepsydra = null) }
             }
 
             is ClepsydraScreenAction.ToggleDiatesi -> {
                 _state.update {
-                    it.copy(currentClepsydra = it.currentClepsydra?.invertiDiatesi())
+                    it.copy(coreClepsydra = it.coreClepsydra?.invertiDiatesi())
                 }
             }
 
@@ -133,7 +134,7 @@ class ClepsydraScreenViewModel(
             }
 
             is ClepsydraScreenAction.OnSetName -> {
-                _state.update { it.copy(currentClepsydra = it.currentClepsydra?.copy(name = action.newName)) }
+                _state.update { it.copy(coreClepsydra = it.coreClepsydra?.copy(name = action.newName)) }
             }
 
             is ClepsydraScreenAction.OnConfirmName -> {
@@ -143,7 +144,7 @@ class ClepsydraScreenViewModel(
             is ClepsydraScreenAction.OnRestore -> {
                 _state.update {
                     it.copy(
-                        currentClepsydra = action.clepsydra.copy(lastStateChange = TimeSource.Monotonic.markNow()),
+                        coreClepsydra = action.clepsydra.copy(lastStateChange = TimeSource.Monotonic.markNow()),
                         showHistory = false
                     )
                 }
@@ -157,18 +158,18 @@ class ClepsydraScreenViewModel(
             }
 
             is ClepsydraScreenAction.OnSetNote -> {
-                _state.update { it.copy(currentClepsydra = it.currentClepsydra?.copy(note = action.newNote)) }
+                _state.update { it.copy(coreClepsydra = it.coreClepsydra?.copy(note = action.newNote)) }
             }
 
             is ClepsydraScreenAction.OnPreviousDay -> {
-                val currentDate = _state.value.selectedDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
-                _state.update { it.copy(selectedDate = currentDate.plus(DatePeriod(days = -1))) }
+                val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
+                _state.update { it.copy(currentLocalDate = currentDate.plus(DatePeriod(days = -1))) }
                 loadClepsydraeForDate()
             }
 
             is ClepsydraScreenAction.OnNextDay -> {
-                val currentDate = _state.value.selectedDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
-                _state.update { it.copy(selectedDate = currentDate.plus(DatePeriod(days = 1))) }
+                val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
+                _state.update { it.copy(currentLocalDate = currentDate.plus(DatePeriod(days = 1))) }
                 loadClepsydraeForDate()
             }
 
@@ -176,14 +177,21 @@ class ClepsydraScreenViewModel(
             is ClepsydraScreenAction.OnPomodoroThresholdCrossed -> {
                 _state.update { it.copy(pomodoroNotifying = true) }
                 viewModelScope.launch {
-                    notificationManager.sendPomodoroNotification(state.value.currentClepsydra!!)
+                    notificationManager.sendPomodoroNotification(state.value.coreClepsydra!!)
                     delay(1.minutes)
                     _state.update { it.copy(pomodoroNotifying = false) }
                 }
             }
 
             is ClepsydraScreenAction.OnCreateNoteAtTime -> {
-                _state.update { it.copy(showNoteDialog = true to action.time) }
+                _state.update { it.copy(showTimedNoteDialog = true) }
+            }
+
+            ClepsydraScreenAction.OnCreateNoteAtTimeCancel -> TODO()
+            is ClepsydraScreenAction.OnCreateNoteAtTimeConfirm -> TODO()
+            is ClepsydraScreenAction.OnSetTags -> {}
+            ClepsydraScreenAction.OnToggleShowJournal -> {
+                _state.update { it.copy(showJournal = !it.showJournal) }
             }
         }
     }

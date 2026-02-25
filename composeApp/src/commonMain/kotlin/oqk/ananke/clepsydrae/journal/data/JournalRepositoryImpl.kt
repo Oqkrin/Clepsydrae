@@ -1,44 +1,45 @@
 package oqk.ananke.clepsydrae.journal.data
 
+import androidx.compose.ui.util.normalizedAngleSin
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.minus
+import kotlinx.datetime.number
 import oqk.ananke.clepsydrae.Database
 import oqk.ananke.clepsydrae.journal.domain.Journal
 import oqk.ananke.clepsydrae.journal.domain.JournalRepository
 import oqk.ananke.clepsydrae.journal.domain.TimeStamp
+import kotlin.time.Duration.Companion.days
 
 class JournalRepositoryImpl(private val database: Database): JournalRepository {
     override suspend fun insertEntry(
-        day: String,
-        init: TimeStamp,
-        end: TimeStamp,
+        day: LocalDate,
+        initTimeStamp: TimeStamp,
+        finTimeStamp: TimeStamp?,
         entry: String
     ) {
-        database.journalQueries.insertEntry(day, init, end, entry)
+        database.journalQueries.insertEntry(day.day.toLong(),day.dayOfWeek.name, day.month.number.toLong(), day.month.name, day.year.toLong(), initTimeStamp, finTimeStamp, entry)
     }
 
-    override suspend fun selectJournalOfDay(
-        day: String,
-        startOfDay: TimeStamp,
-        endOfDay: TimeStamp
-    ): Journal {
+    override suspend fun selectJournalOfDay(day: LocalDate): Journal {
+        val prevDay = day - DatePeriod(days = 1)
 
-        val journals = database.journalQueries.selectJournalOfDay(day, startOfDay, endOfDay).executeAsList()
+        val journalOfDay = Journal(day)
 
-        val entryMap: Map<TimeStamp, String> = journals.associate { it.init_ to it.entry!! }
+        val entriesOfDay = database.journalQueries.selectJournalOfDay(day.day.toLong(), day.month.number.toLong(), day.year.toLong(), prevDay.day.toLong(), prevDay.month.number.toLong(), prevDay.year.toLong())
 
-        return Journal(day, entryMap)
+        entriesOfDay.executeAsList().forEach {
+            journalOfDay.addEntry(it.initTimeStamp, it.entry ?: "", it.finTimeStamp)
+        }
+
+        return journalOfDay
+
     }
 
-    override suspend fun updateEntry(
-        day: String,
-        init: TimeStamp,
-        end: TimeStamp,
-        entry: String
-    ) {
-        database.journalQueries.updateEntry(day, init, end, entry)
+    override suspend fun updateEntry(day: LocalDate, initTimeStamp: TimeStamp, finTimeStamp: TimeStamp?, entry: String) {
     }
 
-    override suspend fun deleteEntry(day: String, init: TimeStamp) {
-        database.journalQueries.deleteEntry(day, init)
+    override suspend fun deleteEntry(day: LocalDate, initTimeStamp: TimeStamp) {
     }
 
 }

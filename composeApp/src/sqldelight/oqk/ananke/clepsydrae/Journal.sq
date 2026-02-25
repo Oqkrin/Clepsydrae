@@ -1,27 +1,33 @@
 CREATE TABLE Journal (
-day TEXT NOT NULL,
-init TEXT NOT NULL,
-end TEXT DEFAULT NULL,
+dayNum INTEGER NOT NULL,
+dayName TEXT NOT NULL,
+monthNum INTEGER NOT NULL,
+monthName TEXT NOT NULL,
+year INTEGER NOT NULL,
+initTimeStamp TEXT NOT NULL,
+finTimeStamp TEXT DEFAULT NULL,
 entry TEXT,
-PRIMARY KEY (day, init)
+PRIMARY KEY (dayNum, monthNum, year, initTimeStamp)
 );
 
-CREATE INDEX idx_journal_end ON Journal(end);
+CREATE INDEX idx_journal_end ON Journal(finTimeStamp);
 
 insertEntry:
-INSERT OR IGNORE INTO Journal(day ,init, end, entry)
-VALUES (:day, :init, :end, :entry);
+INSERT OR IGNORE INTO Journal(dayNum, dayName, monthNum, monthName, year ,initTimeStamp, finTimeStamp, entry)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 selectJournalOfDay:
-SELECT * FROM Journal WHERE day = :day
-UNION SELECT * FROM  Journal WHERE init >= :startOfDay AND init < :endOfDay
-UNION SELECT * FROM  Journal WHERE end >= :startOfDay AND end < :endOfDay;
+SELECT * FROM Journal
+WHERE dayNum = :dayNum AND monthNum = :monthNum AND year = :year
+UNION
+SELECT * FROM Journal
+WHERE dayNum = :prevDayNum AND monthNum = :prevMonthNum AND year = :prevYear AND finTimeStamp IS NULL;
 
 updateEntry:
 UPDATE OR IGNORE Journal SET
-end = :end,
+finTimeStamp = :end,
 entry = :entry
-WHERE day = :day AND init = :init;
+WHERE dayNum = :dayNum AND monthName = :monthNum AND year = :year AND initTimeStamp = :init;
 
 deleteEntry:
-DELETE FROM Journal WHERE day = :day AND init = :init;
+DELETE FROM Journal WHERE dayNum = :dayNum AND monthName = :monthNum AND year = :year AND initTimeStamp = :initTimeStamp;

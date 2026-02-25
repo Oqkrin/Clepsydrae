@@ -80,11 +80,12 @@ fun Clepsydra.shouldNotifyPomodoro(elapsed: Duration = lastStateChange.elapsedNo
     return remainder in 0..5
 }
 
-fun dts(duration: Duration): String {
+fun dts(duration: Duration, showHours: Boolean = false): String {
     return duration.toComponents { hours, minutes, seconds, _ ->
         val mm = minutes.toString().padStart(2, '0')
         val ss = seconds.toString().padStart(2, '0')
-        if (hours > 0) "$hours:$mm:$ss" else "$mm:$ss"
+        val hh = hours.toString().padStart(2, '0')
+        if ( showHours || hours > 0) "$hh:$mm:$ss" else "$mm:$ss"
     }
 }
 
@@ -95,4 +96,4 @@ fun startOfDay(): TimeMark = Clock.System.todayIn(TimeZone.currentSystemDefault(
     .atStartOfDayIn(TimeZone.currentSystemDefault())
     .toEpochMilliseconds().toTimeMark()
 
-fun Duration.asText(): String = dts(this)
+fun Duration.asText(showHours: Boolean = false): String = dts(this, showHours)

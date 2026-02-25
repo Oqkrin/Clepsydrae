@@ -1,6 +1,7 @@
 package oqk.ananke.clepsydrae.clepsydrae.presentation
 
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
+import oqk.ananke.clepsydrae.journal.domain.TimeStamp
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -28,15 +29,18 @@ sealed interface ClepsydraScreenAction {
         val startActive: Boolean = presetClepsydra?.isActive ?: false
     ) : ClepsydraScreenAction
 
-    data class OnCreateNoteAtTime(val time: String): ClepsydraScreenAction
+    data class OnCreateNoteAtTime(val time: TimeStamp): ClepsydraScreenAction
+    data class OnCreateNoteAtTimeConfirm(val entry: Pair<TimeStamp, String>): ClepsydraScreenAction
+    data object OnCreateNoteAtTimeCancel: ClepsydraScreenAction
+    data object OnToggleShowJournal: ClepsydraScreenAction
     data object OnFirstClepsydraCreation: ClepsydraScreenAction
     data object OnFirstClepsydraCreationOnResult: ClepsydraScreenAction
-    data object OnCreateWithName : ClepsydraScreenAction
-    data object OnClose : ClepsydraScreenAction
+    data object OnCloseCoreClepsydra : ClepsydraScreenAction
     data object ToggleDiatesi : ClepsydraScreenAction
     data object ToggleHistory : ClepsydraScreenAction
     data class OnSetName(val newName: String) : ClepsydraScreenAction
     data class OnSetNote(val newNote: String) : ClepsydraScreenAction
+    data class OnSetTags(val newTags: String) : ClepsydraScreenAction
     data object OnConfirmName : ClepsydraScreenAction
     data class OnRestore(val clepsydra: Clepsydra) : ClepsydraScreenAction
     data class OnDelete(val id: Long) : ClepsydraScreenAction

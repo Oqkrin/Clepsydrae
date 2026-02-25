@@ -16,9 +16,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.util.fastCoerceIn
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
-import kotlinx.datetime.LocalDate
+import kotlin.math.exp
+import kotlin.math.log
+import kotlin.math.pow
 
 /**
  * Scope interface for screen composables providing state, actions, window info, and responsive utilities.
@@ -119,18 +122,13 @@ interface ScreenScope<S, A> {
         if(condition) Row(Modifier, horizontalArrangement, verticalAlignment) { content() }
         else Column(Modifier,verticalArrangement ,horizontalAlignment ) { content() }
     }
+
 }
 
 fun Modifier.debugBorder(dp: Dp = 1.dp ,color: Color = Color.Green): Modifier = border(dp, color)
 
 const val phi = 1.618f
 const val iPhi = 0.618f
-
-fun formatDate(date: LocalDate): String {
-    val dayName = date.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }
-    val monthName = date.month.name.lowercase().replaceFirstChar { it.uppercase() }
-    return "$dayName ${date.day} $monthName ${date.year}"
-}
 
 fun WindowSizeClass.isTall(): Boolean = this.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
 fun WindowSizeClass.isWide(): Boolean = this.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)

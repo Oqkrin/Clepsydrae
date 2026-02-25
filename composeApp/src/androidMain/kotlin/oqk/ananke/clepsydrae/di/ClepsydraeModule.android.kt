@@ -25,7 +25,8 @@ actual fun platformModule(notificationManager: NotificationManager) = module {
     factory { ClepsydraScreenViewModel(
         clepsydraRepository = get(),
         settingsRepository = get(),
-        notificationManager = get()
+        notificationManager = get(),
+        journalRepository = get()
     ) }
     factory { SettingsScreenViewModel(get()) }
 }
