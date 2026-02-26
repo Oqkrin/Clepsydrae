@@ -190,8 +190,8 @@ class ClepsydraScreenViewModel(
             ClepsydraScreenAction.OnCreateNoteAtTimeCancel -> TODO()
             is ClepsydraScreenAction.OnCreateNoteAtTimeConfirm -> TODO()
             is ClepsydraScreenAction.OnSetTags -> {}
-            ClepsydraScreenAction.OnToggleShowJournal -> {
-                _state.update { it.copy(showJournal = !it.showJournal) }
+            is ClepsydraScreenAction.OnToggleShowJournal -> {
+                _state.update { it.copy(showJournal = action.show) }
             }
         }
     }

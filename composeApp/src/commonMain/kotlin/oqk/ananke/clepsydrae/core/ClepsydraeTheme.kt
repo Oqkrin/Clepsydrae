@@ -13,115 +13,117 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 
-// ============================================================================
-// MIDNIGHT MIST (Dark Rain Aesthetic)
-// Deep oceanic backgrounds with bioluminescent cyan and frosted slate.
-// ============================================================================
-private val MidnightPrimary = Color(0xFF82CFFF)
-private val MidnightOnPrimary = Color(0xFF00344B)
-private val MidnightPrimaryContainer = Color(0xFF004C6A)
-private val MidnightOnPrimaryContainer = Color(0xFFC3E8FF)
+// PRIMARY — bioluminescent rain light
+private val AbyssPrimary = Color(0xFF6FD3FF)
+private val AbyssOnPrimary = Color(0xFF002533)
+private val AbyssPrimaryContainer = Color(0xFF003A52)
+private val AbyssOnPrimaryContainer = Color(0xFFCBEFFF)
 
-private val MidnightSecondary = Color(0xFFA5C8D4)
-private val MidnightOnSecondary = Color(0xFF0A313E)
-private val MidnightSecondaryContainer = Color(0xFF264855)
-private val MidnightOnSecondaryContainer = Color(0xFFC1E4F1)
+// SECONDARY — fog steel
+private val AbyssSecondary = Color(0xFF9FBFCC)
+private val AbyssOnSecondary = Color(0xFF08303C)
+private val AbyssSecondaryContainer = Color(0xFF213F4B)
+private val AbyssOnSecondaryContainer = Color(0xFFCBE5F0)
 
-private val MidnightTertiary = Color(0xFF5EEAD4)
-private val MidnightOnTertiary = Color(0xFF003730)
-private val MidnightTertiaryContainer = Color(0xFF005047)
-private val MidnightOnTertiaryContainer = Color(0xFF7FF8E2)
+// TERTIARY — rainfall energy accent
+private val AbyssTertiary = Color(0xFF7CE0C6)
+private val AbyssOnTertiary = Color(0xFF00382E)
+private val AbyssTertiaryContainer = Color(0xFF005046)
+private val AbyssOnTertiaryContainer = Color(0xFFA7F5E2)
 
-private val MidnightBackground = Color(0xFF0A1015)
-private val MidnightOnBackground = Color(0xFFDEE3E6)
-private val MidnightSurface = Color(0xFF0E151B)
-private val MidnightOnSurface = Color(0xFFDEE3E6)
+// TRUE MATERIAL SURFACE STACK
+private val AbyssBackground = Color(0xFF070C10)
+private val AbyssSurface = Color(0xFF0D1419)
+private val AbyssSurfaceVariant = Color(0xFF26333B)
 
-private val MidnightSurfaceVariant = Color(0xFF212E36)
-private val MidnightOnSurfaceVariant = Color(0xFFBEC8CE)
-private val MidnightOutline = Color(0xFF889298)
+private val AbyssOnBackground = Color(0xFFDDE5EA)
+private val AbyssOnSurface = Color(0xFFDDE5EA)
+private val AbyssOnSurfaceVariant = Color(0xFFBAC6CC)
 
-// ============================================================================
-// MORNING DEW (Light Rain Aesthetic)
-// Crisp morning skies, soft fog grays, and deep ocean primary text.
-// ============================================================================
-private val MorningPrimary = Color(0xFF00658D)
-private val MorningOnPrimary = Color(0xFFFFFFFF)
-private val MorningPrimaryContainer = Color(0xFFC3E8FF)
-private val MorningOnPrimaryContainer = Color(0xFF001E2D)
+private val AbyssOutline = Color(0xFF7A878E)
 
-private val MorningSecondary = Color(0xFF40606D)
-private val MorningOnSecondary = Color(0xFFFFFFFF)
-private val MorningSecondaryContainer = Color(0xFFC1E4F1)
-private val MorningOnSecondaryContainer = Color(0xFF001F29)
 
-private val MorningTertiary = Color(0xFF006A5F)
-private val MorningOnTertiary = Color(0xFFFFFFFF)
-private val MorningTertiaryContainer = Color(0xFF7FF8E2)
-private val MorningOnTertiaryContainer = Color(0xFF00201C)
+//LIGHT THEME COLORS
+private val DewPrimary = Color(0xFF005E82)
+private val DewOnPrimary = Color.White
+private val DewPrimaryContainer = Color(0xFFBFE9FF)
+private val DewOnPrimaryContainer = Color(0xFF001E2A)
 
-private val MorningBackground = Color(0xFFF6FAFD)
-private val MorningOnBackground = Color(0xFF181C1E)
-private val MorningSurface = Color(0xFFF9FBFA)
-private val MorningOnSurface = Color(0xFF181C1E)
+private val DewSecondary = Color(0xFF4A626C)
+private val DewOnSecondary = Color.White
+private val DewSecondaryContainer = Color(0xFFCDE7F0)
+private val DewOnSecondaryContainer = Color(0xFF051F27)
 
-private val MorningSurfaceVariant = Color(0xFFDBE4E9)
-private val MorningOnSurfaceVariant = Color(0xFF40484C)
-private val MorningOutline = Color(0xFF70787D)
+private val DewTertiary = Color(0xFF006B5D)
+private val DewOnTertiary = Color.White
+private val DewTertiaryContainer = Color(0xFF97F3E0)
+private val DewOnTertiaryContainer = Color(0xFF00201B)
+
+// Wet reflective surfaces
+private val DewBackground = Color(0xFFF2F7FA)
+private val DewSurface = Color(0xFFF7FBFD)
+private val DewSurfaceVariant = Color(0xFFD6E3E9)
+
+private val DewOnBackground = Color(0xFF161C1F)
+private val DewOnSurface = Color(0xFF161C1F)
+private val DewOnSurfaceVariant = Color(0xFF3F4A50)
+
+private val DewOutline = Color(0xFF6F7A80)
 
 // ============================================================================
 // SCHEMES
 // ============================================================================
 val DarkRainScheme = darkColorScheme(
-    primary = MidnightPrimary,
-    onPrimary = MidnightOnPrimary,
-    primaryContainer = MidnightPrimaryContainer,
-    onPrimaryContainer = MidnightOnPrimaryContainer,
-    secondary = MidnightSecondary,
-    onSecondary = MidnightOnSecondary,
-    secondaryContainer = MidnightSecondaryContainer,
-    onSecondaryContainer = MidnightOnSecondaryContainer,
-    tertiary = MidnightTertiary,
-    onTertiary = MidnightOnTertiary,
-    tertiaryContainer = MidnightTertiaryContainer,
-    onTertiaryContainer = MidnightOnTertiaryContainer,
-    background = MidnightBackground,
-    onBackground = MidnightOnBackground,
-    surface = MidnightSurface,
-    onSurface = MidnightOnSurface,
-    surfaceVariant = MidnightSurfaceVariant,
-    onSurfaceVariant = MidnightOnSurfaceVariant,
-    outline = MidnightOutline,
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6)
-)
+    primary = AbyssPrimary,
+    onPrimary = AbyssOnPrimary,
+    primaryContainer = AbyssPrimaryContainer,
+    onPrimaryContainer = AbyssOnPrimaryContainer,
 
+    secondary = AbyssSecondary,
+    onSecondary = AbyssOnSecondary,
+    secondaryContainer = AbyssSecondaryContainer,
+    onSecondaryContainer = AbyssOnSecondaryContainer,
+
+    tertiary = AbyssTertiary,
+    onTertiary = AbyssOnTertiary,
+    tertiaryContainer = AbyssTertiaryContainer,
+    onTertiaryContainer = AbyssOnTertiaryContainer,
+
+    background = AbyssBackground,
+    surface = AbyssSurface,
+    surfaceVariant = AbyssSurfaceVariant,
+
+    onBackground = AbyssOnBackground,
+    onSurface = AbyssOnSurface,
+    onSurfaceVariant = AbyssOnSurfaceVariant,
+
+    outline = AbyssOutline
+)
 val LightRainScheme = lightColorScheme(
-    primary = MorningPrimary,
-    onPrimary = MorningOnPrimary,
-    primaryContainer = MorningPrimaryContainer,
-    onPrimaryContainer = MorningOnPrimaryContainer,
-    secondary = MorningSecondary,
-    onSecondary = MorningOnSecondary,
-    secondaryContainer = MorningSecondaryContainer,
-    onSecondaryContainer = MorningOnSecondaryContainer,
-    tertiary = MorningTertiary,
-    onTertiary = MorningOnTertiary,
-    tertiaryContainer = MorningTertiaryContainer,
-    onTertiaryContainer = MorningOnTertiaryContainer,
-    background = MorningBackground,
-    onBackground = MorningOnBackground,
-    surface = MorningSurface,
-    onSurface = MorningOnSurface,
-    surfaceVariant = MorningSurfaceVariant,
-    onSurfaceVariant = MorningOnSurfaceVariant,
-    outline = MorningOutline,
-    error = Color(0xFFBA1A1A),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF410002)
+    primary = DewPrimary,
+    onPrimary = DewOnPrimary,
+    primaryContainer = DewPrimaryContainer,
+    onPrimaryContainer = DewOnPrimaryContainer,
+
+    secondary = DewSecondary,
+    onSecondary = DewOnSecondary,
+    secondaryContainer = DewSecondaryContainer,
+    onSecondaryContainer = DewOnSecondaryContainer,
+
+    tertiary = DewTertiary,
+    onTertiary = DewOnTertiary,
+    tertiaryContainer = DewTertiaryContainer,
+    onTertiaryContainer = DewOnTertiaryContainer,
+
+    background = DewBackground,
+    surface = DewSurface,
+    surfaceVariant = DewSurfaceVariant,
+
+    onBackground = DewOnBackground,
+    onSurface = DewOnSurface,
+    onSurfaceVariant = DewOnSurfaceVariant,
+
+    outline = DewOutline
 )
 
 

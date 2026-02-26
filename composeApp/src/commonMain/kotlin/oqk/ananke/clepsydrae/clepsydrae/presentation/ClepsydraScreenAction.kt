@@ -32,7 +32,7 @@ sealed interface ClepsydraScreenAction {
     data class OnCreateNoteAtTime(val time: TimeStamp): ClepsydraScreenAction
     data class OnCreateNoteAtTimeConfirm(val entry: Pair<TimeStamp, String>): ClepsydraScreenAction
     data object OnCreateNoteAtTimeCancel: ClepsydraScreenAction
-    data object OnToggleShowJournal: ClepsydraScreenAction
+    data class OnToggleShowJournal(val show: Boolean = true): ClepsydraScreenAction
     data object OnFirstClepsydraCreation: ClepsydraScreenAction
     data object OnFirstClepsydraCreationOnResult: ClepsydraScreenAction
     data object OnCloseCoreClepsydra : ClepsydraScreenAction
