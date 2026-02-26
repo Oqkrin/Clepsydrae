@@ -129,7 +129,7 @@ fun ClepsydraScreen(navController: NavController) {
                     WaterDroplets()
                     Row {
                         Column(modifier = Modifier.width(if(!isNarrow || isShort) 70.dp else 0.dp).padding(start = 16.adp())) { }
-                        Column(modifier = Modifier.weight(1f).padding(horizontal = if(isNarrow) 16.dp else 0.dp)) {
+                        Column(modifier = Modifier.weight(1f).padding(horizontal = if(isNarrow && !isShort) 16.dp else 0.dp)) {
                             Box {
                                 st.coreClepsydra?.let {
                                     MorphingTimer(Modifier.align(Alignment.Center))
