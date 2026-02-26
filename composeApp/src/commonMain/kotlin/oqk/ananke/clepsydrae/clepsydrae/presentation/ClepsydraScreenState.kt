@@ -8,10 +8,10 @@ import kotlin.time.TimeMark
 data class ClepsydraScreenState(
     val coreClepsydra: Clepsydra? = null,
     val secondaryClepsydrae: List<Clepsydra> = emptyList(),
-    val journalOfDay: Journal? = null,
     val pastClepsydrae: List<Clepsydra> = emptyList(),
     val futureClepsydrae: List<Clepsydra> = emptyList(),
     val currentLocalDate: LocalDate? = null,
+    val journalOfDay: Journal = Journal(currentLocalDate),
     val startOfDay: TimeMark? = null,
     val dateText: String = "",
     val showJournal: Boolean = false,
@@ -20,4 +20,5 @@ data class ClepsydraScreenState(
     val showTimedNoteDialog: Boolean = false,
     val pomodoroNotifying: Boolean = false,
     val showNotificationPermissionPopUp: Boolean = false,
+    val journalReloadedTimes: Int = 0
 )

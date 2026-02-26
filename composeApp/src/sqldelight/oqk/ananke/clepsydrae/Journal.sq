@@ -27,7 +27,7 @@ updateEntry:
 UPDATE OR IGNORE Journal SET
 finTimeStamp = :end,
 entry = :entry
-WHERE dayNum = :dayNum AND monthName = :monthNum AND year = :year AND initTimeStamp = :init;
+WHERE dayNum = :dayNum AND monthNum = :monthNum AND year = :year AND initTimeStamp = :init;
 
 deleteEntry:
-DELETE FROM Journal WHERE dayNum = :dayNum AND monthName = :monthNum AND year = :year AND initTimeStamp = :initTimeStamp;
+DELETE FROM Journal WHERE dayNum = :dayNum AND monthNum = :monthNum AND year = :year AND initTimeStamp = :initTimeStamp;

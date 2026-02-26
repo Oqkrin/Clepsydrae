@@ -2,6 +2,7 @@ package oqk.ananke.clepsydrae.clepsydrae.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
@@ -29,6 +31,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 
+@OptIn(ExperimentalTime::class)
 class ClepsydraScreenViewModel(
     private val clepsydraRepository: ClepsydraRepository,
     private val settingsRepository: SettingsRepository,
@@ -39,23 +42,46 @@ class ClepsydraScreenViewModel(
     val state = _state.asStateFlow()
     
     init {
-        loadClepsydraeForDate()
+        loadDate(Clock.System.todayIn(TimeZone.currentSystemDefault()))
     }
+
+    @OptIn(ExperimentalTime::class)
+    private fun loadDate(localDate: LocalDate) {
+            _state.update { it.copy(
+                currentLocalDate = localDate,
+                dateText = formatDate(localDate),
+                startOfDay = localDate.atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds().toTimeMark()
+            ) }
+
+        loadClepsydraeForDate(localDate)
+        loadJournalOfDay(localDate)
+    }
+
+    private var journalJob: Job? = null
     
     @OptIn(ExperimentalTime::class)
-    private fun loadClepsydraeForDate() {
+    private fun loadClepsydraeForDate(localDate: LocalDate? = _state.value.currentLocalDate) {
         viewModelScope.launch {
-            val date = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
-            val list = clepsydraRepository.getClepsydraeByDate(date)
+            val list = clepsydraRepository.getClepsydraeByDate(localDate!!)
             val past = list.filter { it.init.elapsedNow() >= Duration.ZERO }
             val future = list.filter { it.init.elapsedNow() < Duration.ZERO }
             _state.update { it.copy(
                 pastClepsydrae = past, 
-                futureClepsydrae = future, 
-                currentLocalDate = date,
-                dateText = formatDate(date),
-                startOfDay = date.atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds().toTimeMark()
+                futureClepsydrae = future
             ) }
+        }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    private fun loadJournalOfDay(localDate: LocalDate? = _state.value.currentLocalDate) {
+        // Cancel previous subscription if it exists
+        journalJob?.cancel()
+
+        // Start observing the new date
+        journalJob = viewModelScope.launch {
+            journalRepository.selectJournalOfDay(localDate!!).collect { updatedJournal ->
+                _state.update { it.copy(journalOfDay = updatedJournal, journalReloadedTimes = state.value.journalReloadedTimes+1) }
+            }
         }
     }
     
@@ -163,14 +189,12 @@ class ClepsydraScreenViewModel(
 
             is ClepsydraScreenAction.OnPreviousDay -> {
                 val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
-                _state.update { it.copy(currentLocalDate = currentDate.plus(DatePeriod(days = -1))) }
-                loadClepsydraeForDate()
+                loadDate(currentDate.plus(DatePeriod(days = -1)))
             }
 
             is ClepsydraScreenAction.OnNextDay -> {
                 val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
-                _state.update { it.copy(currentLocalDate = currentDate.plus(DatePeriod(days = 1))) }
-                loadClepsydraeForDate()
+                loadDate(currentDate.plus(DatePeriod(days = 1)))
             }
 
 
@@ -184,11 +208,33 @@ class ClepsydraScreenViewModel(
             }
 
             is ClepsydraScreenAction.OnCreateNoteAtTime -> {
-                _state.update { it.copy(showTimedNoteDialog = true) }
+                _state.update { it.copy(showJournal = true) }
+                viewModelScope.launch {
+                    val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
+                    journalRepository.insertEntry(
+                        currentDate, action.time, entry = "",
+                        finTimeStamp = null
+                    )
+
+                    loadJournalOfDay()
+                }
             }
 
-            ClepsydraScreenAction.OnCreateNoteAtTimeCancel -> TODO()
-            is ClepsydraScreenAction.OnCreateNoteAtTimeConfirm -> TODO()
+            is ClepsydraScreenAction.OnDeleteEntryAtTime -> {
+                viewModelScope.launch {
+                    val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
+                    journalRepository.deleteEntry(currentDate, action.time)
+                    loadJournalOfDay()
+                }
+            }
+
+            is ClepsydraScreenAction.OnSetEntryAtTime -> {
+                viewModelScope.launch {
+                    val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
+                    journalRepository.updateEntry(currentDate, action.time, action.entry.second, action.entry.first)
+                    loadJournalOfDay()
+                }
+            }
             is ClepsydraScreenAction.OnSetTags -> {}
             is ClepsydraScreenAction.OnToggleShowJournal -> {
                 _state.update { it.copy(showJournal = action.show) }
