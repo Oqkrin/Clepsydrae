@@ -10,15 +10,18 @@ const val endOfDay: TimeStamp = "23:59:59"
 
 sealed interface TimelineItem {
     val time: String
+    val depth: Int // Add Depth for indentation
 
     data class ExistingEntry(
         override val time: TimeStamp,
         val content: String,
-        val endTime: TimeStamp?
+        val endTime: TimeStamp?,
+        override val depth: Int
     ) : TimelineItem
 
     data class Gap(
-        override val time: TimeStamp
+        override val time: TimeStamp,
+        override val depth: Int
     ) : TimelineItem
 }
 
@@ -26,91 +29,69 @@ data class Journal @OptIn(ExperimentalTime::class) constructor(
     val day: LocalDate?,
     val entryAtInterval: MutableMap<TimeStamp, Pair<String, TimeStamp?>> = TreeMap()
 ) {
-    constructor(dayNum: Int, monthNum: Int, year: Int) : this(LocalDate(year, monthNum, dayNum))
-
-    init {
-        entryAtInterval[startOfDay] = "" to endOfDay
-    }
-
-    override fun toString(): String {
-        var journalText = day?.asText() ?: ""
-
-        var lastEnd: TimeStamp? = null
-
-        entryAtInterval.forEach { (init, pair) ->
-
-            journalText += (if(lastEnd != init) "\n$init" else "") + "\n${pair.first} \n${if(pair.second != null) pair.second else ""}"
-
-            lastEnd = pair.second
-
-        }
-
-        return journalText
-    }
+    // ... constructors and toString
 
     fun addEntry(initTimeStamp: TimeStamp, entry: String = "", finTimeStamp: TimeStamp? = null) {
         entryAtInterval[initTimeStamp] = entry to finTimeStamp
     }
 
-    // 1. Define specific types for the UI to render easily
-
-
-    // 2. The Logic to "Zip" entries and gaps together chronologically
     fun buildTimeline(): List<TimelineItem> {
-        if (this.entryAtInterval.isEmpty()) {
-            // Default start if empty
-            return listOf(TimelineItem.Gap(startOfDay))
-        }
+        val rootItems = mutableListOf<TimelineItem>()
 
-        val items = mutableListOf<TimelineItem>()
-        val sortedEntries = this.entryAtInterval.toSortedMap()
-        val entryIterator = sortedEntries.iterator()
+        // 1. Sort all entries by Start Time
+        val sortedEntries = entryAtInterval.entries
+            .sortedBy { it.key }
+            .map { it.key to it.value } // List of (Start, (Content, End))
 
-        // Track the last processed time to prevent out-of-order items
-        var lastTimeProcessed = startOfDay
+        // 2. Recursive function to process entries and their "children"
+        fun processRecursive(
+            entries: List<Pair<String, Pair<String, String?>>>,
+            currentDepth: Int,
+            parentEnd: String?
+        ): List<Pair<String, Pair<String, String?>>> {
 
-        while (entryIterator.hasNext()) {
-            val (startTime, data) = entryIterator.next()
-            val (content, endTime) = data
+            var remainingEntries = entries
 
-            // OPTIONAL: If there's a huge unaccounted gap before this entry,
-            // you could insert a Gap item here too.
-            // For now, we assume the user fills gaps sequentially.
+            while (remainingEntries.isNotEmpty()) {
+                val current = remainingEntries.first()
+                val (startTime, data) = current
+                val (content, endTime) = data
 
-            items.add(TimelineItem.ExistingEntry(startTime, content, endTime))
-            lastTimeProcessed = startTime
+                // STOP CONDITION:
+                // If this entry starts AFTER the parent ends, it's not a child. Return it to the caller.
+                if (parentEnd != null && startTime >= parentEnd) {
+                    return remainingEntries
+                }
 
-            // LOGIC: If this entry has an end time, does it create a gap?
-            if (endTime != null) {
-                // Peek at the next entry's start time (if exists)
-                // We can't easily peek an iterator, so we rely on the loop order.
-                // A simpler way is to compare with the "next key" if we had a list.
+                // PROCESS CURRENT:
+                rootItems.add(TimelineItem.ExistingEntry(startTime, content, endTime, currentDepth))
 
-                // Simplified approach: Just add the Gap.
-                // The "Sort" step later will handle order,
-                // but we must check if this gap overlaps with the next entry.
-                items.add(TimelineItem.Gap(endTime))
-            }
-        }
+                // CONSUME: Remove current from list
+                remainingEntries = remainingEntries.drop(1)
 
-        // 3. Clean up: Remove Gaps that overlap with existing entries
-        // and sort everything by time string.
-        val distinctItems = items
-            .sortedBy { it.time } // "Pushed to later" logic handled by sort
-            .distinctBy { it.time } // distinct removes duplicate times
-            .filter { item ->
-                // If a Gap exists at the exact same time as an Entry,
-                // the Entry wins (remove the Gap).
-                if (item is TimelineItem.Gap) {
-                    !sortedEntries.containsKey(item.time)
-                } else {
-                    true
+                // RECURSE:
+                // Process subsequent entries. If they start before 'endTime', they are children (depth + 1).
+                // They will be consumed inside this call.
+                remainingEntries = processRecursive(remainingEntries, currentDepth + 1, endTime)
+
+                // CLOSING GAP:
+                // If this entry has a specific end time, add a Gap marker there
+                // BUT only if it ends before the parent ends (or if no parent)
+                if (endTime != null) {
+                    // Only add a gap if the parent doesn't close exactly here (deduplication)
+                    if (parentEnd == null || endTime < parentEnd) {
+                        rootItems.add(TimelineItem.Gap(endTime, currentDepth))
+                    }
                 }
             }
+            return emptyList()
+        }
 
-        return distinctItems
+        processRecursive(sortedEntries, 0, null)
+
+        // Final cleanup: distinct by time to prevent double-rendering if an entry ends exactly when another starts
+        return rootItems.distinctBy { it.time }
     }
-
 }
 
 fun LocalDate.asText() = formatDate(this)

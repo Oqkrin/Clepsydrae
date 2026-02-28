@@ -23,6 +23,8 @@ import oqk.ananke.clepsydrae.clepsydrae.domain.invertiDiatesi
 import oqk.ananke.clepsydrae.core.NotificationManager
 import oqk.ananke.clepsydrae.journal.domain.formatDate
 import oqk.ananke.clepsydrae.journal.domain.JournalRepository
+import oqk.ananke.clepsydrae.journal.domain.endOfDay
+import oqk.ananke.clepsydrae.journal.domain.startOfDay
 import oqk.ananke.clepsydrae.settings.domain.SettingsRepository
 import kotlin.let
 import kotlin.time.Clock
@@ -80,7 +82,15 @@ class ClepsydraScreenViewModel(
         // Start observing the new date
         journalJob = viewModelScope.launch {
             journalRepository.selectJournalOfDay(localDate!!).collect { updatedJournal ->
-                _state.update { it.copy(journalOfDay = updatedJournal, journalReloadedTimes = state.value.journalReloadedTimes+1) }
+
+                _state.update { it.copy(journalOfDay = updatedJournal , journalReloadedTimes = state.value.journalReloadedTimes+1) }
+
+                if(state.value.journalOfDay.entryAtInterval.size == 1 && state.value.journalOfDay.entryAtInterval[updatedJournal.entryAtInterval.keys.first()]?.second == null) {
+                    journalRepository.insertEntry(localDate, startOfDay, entry = state.value.journalOfDay.entryAtInterval[startOfDay]?.first
+                        ?: "", finTimeStamp = endOfDay)
+                    loadJournalOfDay(localDate)
+                }
+
             }
         }
     }
@@ -223,7 +233,15 @@ class ClepsydraScreenViewModel(
             is ClepsydraScreenAction.OnDeleteEntryAtTime -> {
                 viewModelScope.launch {
                     val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
-                    journalRepository.deleteEntry(currentDate, action.time)
+
+                    if(action.index != 0 && state.value.journalOfDay.entryAtInterval[action.prevItem!!.time]?.second != null)
+                        journalRepository.updateEntry(
+                            currentDate,
+                            action.prevItem.time,
+                            action.nextTime ?: endOfDay,
+                            state.value.journalOfDay.entryAtInterval[action.prevItem.time]?.first ?: ""
+                        )
+                    journalRepository.deleteEntry(currentDate, action.selectedTime)
                     loadJournalOfDay()
                 }
             }
@@ -231,7 +249,9 @@ class ClepsydraScreenViewModel(
             is ClepsydraScreenAction.OnSetEntryAtTime -> {
                 viewModelScope.launch {
                     val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
-                    journalRepository.updateEntry(currentDate, action.time, action.entry.second, action.entry.first)
+                    if(_state.value.journalOfDay.entryAtInterval.containsKey(action.time))
+                        journalRepository.updateEntry(currentDate, action.time, action.entry.second, action.entry.first)
+                    else journalRepository.insertEntry(currentDate, action.time,action.entry.second, action.entry.first)
                     loadJournalOfDay()
                 }
             }

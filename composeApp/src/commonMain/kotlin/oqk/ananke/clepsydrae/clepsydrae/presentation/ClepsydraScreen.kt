@@ -1,6 +1,5 @@
 package oqk.ananke.clepsydrae.clepsydrae.presentation
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.expandIn
 import androidx.compose.animation.expandVertically
@@ -15,12 +14,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
@@ -35,26 +31,23 @@ import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.*
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.modifier.modifierLocalOf
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
@@ -62,14 +55,12 @@ import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import oqk.ananke.clepsydrae.clepsydrae.data.toBooleanLong
 import oqk.ananke.clepsydrae.clepsydrae.domain.asText
 import oqk.ananke.clepsydrae.clepsydrae.domain.shouldNotifyPomodoro
 import oqk.ananke.clepsydrae.clepsydrae.domain.strlapsed
 import oqk.ananke.clepsydrae.core.*
-import oqk.ananke.clepsydrae.journal.domain.Journal
-import oqk.ananke.clepsydrae.journal.domain.TimeStamp
 import oqk.ananke.clepsydrae.journal.domain.TimelineItem
+import oqk.ananke.clepsydrae.journal.presentation.ClepsydraJournal
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -217,115 +208,6 @@ fun ClepsydraScreen(navController: NavController) {
     }
 }
 
-@Composable
-fun ClepsydraScope.ClepsydraJournal(modifier: Modifier = Modifier) {
-    val timelineItems = remember(st.journalOfDay) {
-        st.journalOfDay.buildTimeline()
-    }
-
-    ElevatedCard(modifier = modifier.fillMaxSize().adaptivePadding()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
-            timelineItems.forEachIndexed { index, item ->
-                // 1. THE TIMESTAMP MARKER
-                item {
-                    TimelineMarker(time = item.time, isGap = item is TimelineItem.Gap)
-                }
-
-                // 2. THE EDITABLE SPACE (Only if there is a "Next" item)
-                if (index < timelineItems.lastIndex) {
-                    val nextItem = timelineItems[index + 1]
-                    item(key = "${item.time}-to-${nextItem.time}") {
-                        TimelineEditableSpace(
-                            initialContent = if (item is TimelineItem.ExistingEntry) item.content else "",
-                            onContentChanged = { newText ->
-                                onAction(ClepsydraScreenAction.OnSetEntryAtTime(item.time, newText to nextItem.time))
-                            },
-                            onDelete = { onAction(ClepsydraScreenAction.OnDeleteEntryAtTime(item.time)) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun TimelineMarker(time: String, isGap: Boolean) {
-    Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Time Label
-        Row(
-            modifier = Modifier.width(70.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.End
-        ) {
-            Text(time.take(5), style = MaterialTheme.typography.labelLargeEmphasized, color = MaterialTheme.colorScheme.primary)
-            Text(time.takeLast(3), style = MaterialTheme.typography.labelMediumEmphasized, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
-        }
-
-        // Dot and Line Start
-        Box(modifier = Modifier.width(24.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-            Box(modifier = Modifier.width(2.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
-            Box(
-                modifier = Modifier.size(10.dp).clip(CircleShape)
-                    .background(if (isGap) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary)
-                    .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
-            )
-        }
-    }
-}
-
-@Composable
-fun TimelineEditableSpace(
-    initialContent: String,
-    onContentChanged: (String) -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        // Spacer for Time column
-        Spacer(modifier = Modifier.width(70.dp))
-
-        // Continuation Line
-        Box(modifier = Modifier.width(24.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-            Box(modifier = Modifier.width(2.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
-        }
-
-        // The actual TextField Area
-        val textState = rememberTextFieldState(initialContent)
-        LaunchedEffect(textState.text) {
-            if (textState.text.toString() != initialContent) {
-                delay(500)
-                onContentChanged(textState.text.toString())
-            }
-        }
-
-        Box(modifier = Modifier.weight(1f).padding(vertical = 8.dp, horizontal = 4.dp)) {
-            BasicTextField(
-                state = textState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
-                    .padding(12.dp)
-                    .defaultMinSize(minHeight = 60.dp),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
-            )
-
-            if (textState.text.isEmpty()) {
-                Text("Entry...", modifier = Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
-            }
-        }
-
-        IconButton(onClick = onDelete, modifier = Modifier.align(Alignment.CenterVertically)) {
-            Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
-        }
-    }
-};
 
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

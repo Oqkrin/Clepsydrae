@@ -49,6 +49,7 @@ import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.asTimeMarkFromStartOfDay
 import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.core.iPhi
+import oqk.ananke.clepsydrae.journal.presentation.TimePickerDialog
 import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -596,7 +597,6 @@ private fun ClepsydraScope.TimeDisplay(
                     )
                 }
                 TimeInputMode.TIMESTAMP -> {
-                    TimestampDisplay(timePickerState, onShowTimePicker)
                 }
             }
         }
@@ -695,73 +695,6 @@ private fun ClepsydraScope.DurationTimeDisplayResponsive(
                         maxValue = 59,
                         modifier = Modifier.size(TAP)
                     )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ClepsydraScope.TimestampDisplay(timePickerState: TimePickerState, onShowTimePicker: () -> Unit) {
-    Surface(
-        onClick = onShowTimePicker,
-        modifier = Modifier
-            .sizeIn(minWidth = TAP-8.dp, minHeight = TAP-8.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
-        tonalElevation = 0.dp
-    ) {
-        Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
-            Text(
-                text = "At ${timePickerState.hour.toString().padStart(2, '0')}:${timePickerState.minute.toString().padStart(2, '0')}",
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
-// ============================================================================
-// TIME PICKER DIALOG
-// ============================================================================
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ClepsydraScope.TimePickerDialog(
-    state: TimePickerState,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Card(
-            modifier = Modifier.wrapContentWidth().widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            shape = RoundedCornerShape(28.dp)
-        ) {
-            Column(modifier = Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Select Time",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 10.dp)
-                )
-
-                TimePicker(state = state)
-
-                Row(
-                    modifier = Modifier.wrapContentWidth(Alignment.End).padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel", fontWeight = FontWeight.Medium) }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    TextButton(onClick = onConfirm) { Text("OK", fontWeight = FontWeight.Bold) }
                 }
             }
         }

@@ -2,6 +2,7 @@ package oqk.ananke.clepsydrae.clepsydrae.presentation
 
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.journal.domain.TimeStamp
+import oqk.ananke.clepsydrae.journal.domain.TimelineItem
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -30,8 +31,15 @@ sealed interface ClepsydraScreenAction {
     ) : ClepsydraScreenAction
 
     data class OnCreateNoteAtTime(val time: TimeStamp): ClepsydraScreenAction
-    data class OnDeleteEntryAtTime(val time: TimeStamp): ClepsydraScreenAction
-    data class  OnSetEntryAtTime(val time: TimeStamp, val entry: Pair<TimeStamp, String?>): ClepsydraScreenAction
+    data class OnDeleteEntryAtTime(
+        val selectedTime: TimeStamp,
+        val prevItem: TimelineItem? = null,
+        val nextTime: TimeStamp? = null,
+        val index: Int = 0
+    ): ClepsydraScreenAction
+    data class  OnSetEntryAtTime(
+        val time: TimeStamp,
+        val entry: Pair<String, TimeStamp?>): ClepsydraScreenAction
 
     data class OnToggleShowJournal(val show: Boolean = true): ClepsydraScreenAction
     data object OnFirstClepsydraCreation: ClepsydraScreenAction
