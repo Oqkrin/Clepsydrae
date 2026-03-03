@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
@@ -53,6 +54,7 @@ import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
+import kotlinx.coroutines.Delay
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import oqk.ananke.clepsydrae.clepsydrae.domain.asText
@@ -136,70 +138,65 @@ fun ClepsydraScreen(navController: NavController) {
                 // Main Content Area
                 Box(Modifier.weight(1f)) {
                     WaterDroplets()
-                    Row {
-                        Column(
-                            modifier = Modifier.width(if (!isNarrow || isShort) 70.dp else 0.dp)
-                                .padding(start = 16.adp())
-                        ) { }
-                        Column(
-                            modifier = Modifier.weight(1f)
-                                .padding(horizontal = if (isNarrow && !isShort) 16.dp else 0.dp)
+                    
+                    Box(Modifier.fillMaxSize().padding(horizontal = if (isNarrow && !isShort) 16.dp else 0.dp)) {
+                        st.coreClepsydra?.let {
+                            MorphingTimer(Modifier.align(Alignment.Center))
+                            SmallFloatingActionButton(
+                                modifier = Modifier
+                                    .align(if (!isShort) Alignment.BottomCenter else Alignment.BottomEnd)
+                                    .adaptivePadding(),
+                                onClick = { onAction(ClepsydraScreenAction.OnCloseCoreClepsydra) },
+                            ) {
+                                Icon(Icons.Default.Close, "Close")
+                            }
+                        } ?: ClepsydraInputFormV2(modifier = Modifier.align(Alignment.BottomCenter))
+
+                        androidx.compose.animation.AnimatedVisibility(
+                            st.showJournal,
+                            modifier = Modifier.align(Alignment.Center),
+                            enter = expandIn() + expandVertically(expandFrom = Alignment.Top),
+                            exit = shrinkOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+                            label = "Journal"
                         ) {
-                            Box {
-                                st.coreClepsydra?.let {
-                                    MorphingTimer(Modifier.align(Alignment.Center))
-                                    SmallFloatingActionButton(
-                                        modifier = Modifier
-                                            .align(if (!isShort) Alignment.BottomCenter else Alignment.BottomEnd)
-                                            .adaptivePadding(),
-                                        onClick = { onAction(ClepsydraScreenAction.OnCloseCoreClepsydra) },
-                                    ) {
-                                        Icon(Icons.Default.Close, "Close")
-                                    }
-                                } ?: ClepsydraInputFormV2(modifier = Modifier.align(Alignment.BottomCenter))
-
-                                androidx.compose.animation.AnimatedVisibility(
-                                    st.showJournal,
-                                    modifier = Modifier.align(Alignment.Center),
-                                    enter = expandIn() + expandVertically(expandFrom = Alignment.Top),
-                                    exit = shrinkOut() + shrinkVertically(shrinkTowards = Alignment.Top),
-                                    label = "Journal"
-                                ) {
-                                    ClepsydraJournal(Modifier.align(Alignment.Center))
-                                }
-
-                            }
-
-                    }
-                        Column(modifier = Modifier.width(if(!isNarrow || isShort) 70.dp else 0.dp).padding(end = 16.adp()), horizontalAlignment = Alignment.End) {
-                            if (isShort) {
-                                Row(modifier = Modifier.weight(iPhi),horizontalArrangement = Arrangement.End) {
-                                    SmallFloatingActionButton(
-                                        modifier = Modifier
-                                            .padding(top = 16.adp()),
-                                        onClick = { navController.navigate("settings") }
-                                    ) {
-                                        Icon(Icons.Default.Settings, "Settings")
-                                    }
-                                }
-                            }
-                            if (!isNarrow || isShort) {
-
-                                Row( modifier = Modifier.weight(phi),horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-
-                                    ClepsydraNavigationBar(Modifier)
-
-                                }
-                            }
+                            ClepsydraJournal(Modifier.align(Alignment.Center))
                         }
                     }
 
+                    if(!isNarrow)  {
+                        ClepsydraNavigationBar(
+                            Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 16.dp)
+                                .fillMaxHeight(iPhi)
+                        )
+                    }
+
+                    if (isShort) {
+                        SmallFloatingActionButton(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 16.dp, end = 16.dp),
+                            onClick = { navController.navigate("settings") }
+                        ) {
+                            Icon(Icons.Default.Settings, "Settings")
+                        }
+                    }
                 }
 
-                Column (modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 16.adp()) , verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally ) {
-                    ClepsydraTimeBar(modifier = Modifier.height(56.dp).align(Alignment.End))
+                Column (modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 16.dp) , verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally ) {
+
+                    Row(modifier = Modifier.align(Alignment.End).padding(start = 8.dp, end = 16.dp), verticalAlignment = Alignment.Bottom) {
+
+                        if(isNarrow && isShort) {
+                            ClepsydraNavigationBar(modifier = Modifier.weight(1f))
+                            Spacer(Modifier.size(2.dp))
+                        }
+                        ClepsydraTimeBar(modifier = Modifier.height(64.dp))
+                    }
+
                     Spacer(modifier = Modifier.height(8.adp()))
-                    if(isNarrow && !isShort) ClepsydraNavigationBar()
+                    if(isNarrow && !isShort) ClepsydraNavigationBar(modifier = Modifier.padding(horizontal = 16.dp))
                 }
 
 
@@ -211,276 +208,101 @@ fun ClepsydraScreen(navController: NavController) {
 
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun ClepsydraScope.ClepsydraNavigationBar(
-    modifier: Modifier = Modifier
-) {
+private fun ClepsydraScope.ClepsydraNavigationBar(modifier: Modifier = Modifier) {
+    val items = listOf("Journal", "Clepsydra", "Habits")
+    val selectedIcons = listOf(Icons.Filled.Book, Icons.Filled.HourglassFull, Icons.Filled.Star)
+    val unselectedIcons = listOf(Icons.Outlined.Book, Icons.Outlined.HourglassDisabled, Icons.Outlined.StarBorder)
+    var selectedItem by remember { mutableIntStateOf(1) }
+    val haptic = LocalHapticFeedback.current
+
+    LaunchedEffect(st.showJournal) {
+        if (st.showJournal) selectedItem = 0
+    }
+
+    val itemColors = NavigationBarItemColors(
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(iPhi),
+        selectedTextColor = MaterialTheme.colorScheme.primary,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(iPhi),
+        selectedIndicatorColor = MaterialTheme.colorScheme.primaryContainer,
+        disabledIconColor = MaterialTheme.colorScheme.error,
+        disabledTextColor = MaterialTheme.colorScheme.error
+    )
+
     Card(
-        shape = RoundedCornerShape(if(isShort) 50 else 75),
-        modifier = modifier.padding(4.adp())
-            .widthIn(max = WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND.dp)
-            .heightIn(max = if (isNarrow && !isShort) (if(isShort) 48.dp else 64.dp) else (sizes.height*2/3) * iPhi),
-        colors = CardDefaults.cardColors().copy(containerColor = Color.Transparent)
+        shape = RoundedCornerShape(37),
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
-        val items = listOf("Journal", "Clepsydra", "Habits")
-        val selectedIcons = listOf(
-            Icons.Filled.Book,
-            Icons.Filled.HourglassFull,
-            Icons.Filled.Star
-        )
-        val unselectedIcons = listOf(
-            Icons.Outlined.Book,
-            Icons.Outlined.HourglassDisabled,
-            Icons.Outlined.StarBorder
-        )
-        var selectedItem by remember { mutableIntStateOf(1) }
-        val haptic = LocalHapticFeedback.current
-
-        if (isNarrow && !isShort) {
-            NavigationBar(containerColor = NavigationBarDefaults.containerColor.copy(alpha = iPhi)) {
-
+        if (isNarrow) {
+            NavigationBar(
+                containerColor = NavigationBarDefaults.containerColor.copy(iPhi),
+                modifier = Modifier.height(64.dp).widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp*2/3)
+            ) {
                 items.fastForEachIndexed { i, label ->
-
                     NavigationBarItem(
                         selected = i == selectedItem,
-                        label = if (!isShort) { {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelMediumEmphasized,
-                                color = LocalContentColor.current.copy(if (i == selectedItem) 1f else iPhi),
-                            )
-                        } }else null,
+                        label = { Text(label, style = MaterialTheme.typography.labelMediumEmphasized, maxLines = 1) },
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                             selectedItem = i
-                            onAction(ClepsydraScreenAction.OnToggleShowJournal(i==0))
+                            onAction(ClepsydraScreenAction.OnToggleShowJournal(i == 0))
                         },
-                        icon = {
-                            Icon(
-                                imageVector = if (i == selectedItem) selectedIcons[i] else unselectedIcons[i],
-                                label
-                            )
-                        },
-                        colors = NavigationBarItemColors(
-                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = iPhi),
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = iPhi),
-                            selectedIndicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            disabledIconColor = MaterialTheme.colorScheme.error,
-                            disabledTextColor = MaterialTheme.colorScheme.error
-                        )
+                        icon = { Icon(if (i == selectedItem) selectedIcons[i] else unselectedIcons[i], label) },
+                        colors = itemColors,
+                        alwaysShowLabel = !(isNarrow && isShort)
                     )
-
                 }
-
             }
-
         } else {
-            NavigationRail(containerColor = NavigationBarDefaults.containerColor.copy(alpha = iPhi)) {
-                Column(modifier.padding(2.adp()).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceAround) {
+            NavigationRail(
+                containerColor = NavigationBarDefaults.containerColor.copy(iPhi),
+                modifier = Modifier.width(80.dp)
+            ) {
+                Column(
+                    Modifier.fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceAround
+                ) {
                     items.fastForEachIndexed { i, label ->
-
                         NavigationRailItem(
                             modifier = Modifier.weight(1f),
                             selected = i == selectedItem,
                             label = {
-                                Box(modifier = Modifier.width(40.dp)) {
-                                        Text(
-                                            label,
-                                            style = MaterialTheme.typography.labelSmallEmphasized,
-                                            color = LocalContentColor.current.copy(if (i == selectedItem) 1f else iPhi),
-                                            autoSize = TextAutoSize.StepBased(1.sp, stepSize = 0.0001.sp),
-                                            maxLines = 1
-                                        )
-                                    }
-                                },
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelSmallEmphasized,
+                                    maxLines = 1
+                                )
+                            },
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                                 selectedItem = i
-
-                                onAction(ClepsydraScreenAction.OnToggleShowJournal(i==0))
-
-
+                                onAction(ClepsydraScreenAction.OnToggleShowJournal(i == 0))
                             },
                             icon = {
                                 Icon(
-                                    imageVector = if (i == selectedItem) selectedIcons[i] else unselectedIcons[i],
+                                    if (i == selectedItem) selectedIcons[i] else unselectedIcons[i],
                                     label,
-                                    modifier = Modifier.sizeIn(0.dp, 0.dp, 28.dp, 28.dp).size(lerp(0.dp, 28.dp,
-                                        sizes.height.value/WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND))
+                                    Modifier.size(24.dp)
                                 )
                             },
                             colors = NavigationRailItemColors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = iPhi),
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = iPhi),
-                                selectedIndicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = iPhi),
-                                disabledIconColor = MaterialTheme.colorScheme.error,
-                                disabledTextColor = MaterialTheme.colorScheme.error
+                                selectedIconColor = itemColors.selectedIconColor,
+                                unselectedIconColor = itemColors.unselectedIconColor,
+                                selectedTextColor = itemColors.selectedTextColor,
+                                unselectedTextColor = itemColors.unselectedTextColor,
+                                selectedIndicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(iPhi),
+                                disabledIconColor = itemColors.disabledIconColor,
+                                disabledTextColor = itemColors.disabledTextColor
                             ),
                             alwaysShowLabel = !isShort
                         )
-
                     }
                 }
             }
         }
-
     }
-}
-
-// ============================================================================
-// TOP BAR & CALENDAR COMPONENTS
-// ============================================================================
-
-@Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
-    // Animation State
-    val textOffset = remember { Animatable(0f) }
-    val textScale = remember { Animatable(1f) }
-    val textRotation = remember { Animatable(0f) }
-    val textOpacity = remember { Animatable(1f) }
-    val coroutineScope = rememberCoroutineScope()
-
-    fun animateDateChange(direction: Int) {
-        coroutineScope.launch {
-            // Exit
-            launch { textScale.animateTo(1.3f, tween(100, easing = EaseInCubic)) }
-            launch { textRotation.animateTo(5f * -direction, tween(100, easing = EaseInCubic)) }
-            launch { textOpacity.animateTo(0.6f, tween(100, easing = EaseInCubic)) }
-            textOffset.animateTo(200f * -direction, tween(100, easing = EaseInCubic))
-
-            // Snap
-            textOffset.snapTo(200f * direction)
-            textRotation.snapTo(-5f * -direction)
-
-            // Enter
-            launch { textScale.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
-            launch { textRotation.animateTo(0f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
-            launch { textOpacity.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
-            textOffset.animateTo(0f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow))
-        }
-    }
-
-    Row(
-        modifier = modifier
-            .widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp * iPhi)
-            .fillMaxWidth()
-            .height(56.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // --- Previous Button (Satellite) ---
-        Box(
-            modifier = Modifier.fillMaxHeight().sq(),
-            contentAlignment = Alignment.Center
-        ) {
-            ArrowButton(
-                modifier = Modifier.fillMaxSize(iPhi),
-                rotation = 360,
-                onClick = {
-                    animateDateChange(-1)
-                    onAction(ClepsydraScreenAction.OnPreviousDay)
-                }
-            )
-        }
-
-        Box(
-            modifier = Modifier.fillMaxWidth(iPhi).fillMaxHeight(),
-            contentAlignment = Alignment.Center
-        ) {
-            Surface(
-                onClick = { navController.navigate("calendar") },
-                modifier = Modifier.fillMaxSize(),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                tonalElevation = 6.dp,
-                shadowElevation = 6.dp
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().adaptivePadding(minPadding = 6.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    val dateComp = st.dateText.split(" ")
-                    Text(
-                        text = "${dateComp[1]} ${dateComp[2]} ${dateComp[3]}",
-                        modifier = Modifier.weight(8f)
-                            .offset(x = textOffset.value.dp)
-                            .scale(textScale.value)
-                            .rotate(textRotation.value)
-                            .alpha(textOpacity.value),
-                        maxLines = 1,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.titleLargeEmphasized,
-                        autoSize = TextAutoSize.StepBased(2.sp)
-                    )
-                    Text(
-                        text = dateComp[0],
-                        modifier = Modifier.weight(5f)
-                            .offset(x = textOffset.value.dp)
-                            .scale(textScale.value)
-                            .rotate(textRotation.value)
-                            .alpha(textOpacity.value),
-                        maxLines = 1,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.titleLargeEmphasized,
-                        color = LocalContentColor.current.copy(alpha = iPhi),
-                        autoSize = TextAutoSize.StepBased(2.sp)
-                    )
-                }
-            }
-        }
-
-        // --- Next Button (Satellite) ---
-        Box(
-            modifier = Modifier.fillMaxHeight().sq(),
-            contentAlignment = Alignment.Center
-        ) {
-            ArrowButton(
-                modifier = Modifier.fillMaxSize(iPhi),
-                rotation = 180,
-                onClick = {
-                    animateDateChange(1)
-                    onAction(ClepsydraScreenAction.OnNextDay)
-                }
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-fun ClepsydraScope.ArrowButton(
-    modifier: Modifier = Modifier,
-    rotation: Int,
-    onClick: () -> Unit
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-
-    // Animate scale: shrink slightly when pressed (inverse phi effect)
-    val targetScale = if (pressed) iPhi else 1f
-    val scale by animateFloatAsState(
-        targetValue = targetScale,
-        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow)
-    )
-
-    Box(
-        modifier = modifier
-            .scale(scale)
-            .shadow(4.dp, MaterialShapes.Arrow.toShape(rotation))
-            .clip(MaterialShapes.Arrow.toShape(rotation))
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable(
-                interactionSource = interaction,
-                indication = LocalIndication.current,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {}
 }
 
 // ============================================================================
@@ -631,14 +453,13 @@ fun ClepsydraScope.TimerContent(elapsed: String) {
 }
 
 // ============================================================================
-// BOTTOM BAR & INPUT
+// INPUT & TIME BAR COMPONENTS
 // ============================================================================
 
 @Composable
 fun ClepsydraScope.ClepsydraInputFormV2(modifier: Modifier) {
     // TODO: Implement input form UI
 }
-
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -694,8 +515,162 @@ fun ClepsydraScope.ClepsydraTimeBar(modifier: Modifier = Modifier) {
 }
 
 // ============================================================================
+// TOP BAR & CALENDAR COMPONENTS
+// ============================================================================
+
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
+    // Animation State
+    val textOffset = remember { Animatable(0f) }
+    val textScale = remember { Animatable(1f) }
+    val textRotation = remember { Animatable(0f) }
+    val textOpacity = remember { Animatable(1f) }
+    val coroutineScope = rememberCoroutineScope()
+
+    fun animateDateChange(direction: Int) {
+        coroutineScope.launch {
+            // Exit
+            launch { textScale.animateTo(1.3f, tween(100, easing = EaseInCubic)) }
+            launch { textRotation.animateTo(5f * -direction, tween(100, easing = EaseInCubic)) }
+            launch { textOpacity.animateTo(0.6f, tween(100, easing = EaseInCubic)) }
+            textOffset.animateTo(200f * -direction, tween(100, easing = EaseInCubic))
+
+            // Snap
+            textOffset.snapTo(200f * direction)
+            textRotation.snapTo(-5f * -direction)
+
+            // Enter
+            launch { textScale.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
+            launch { textRotation.animateTo(0f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
+            launch { textOpacity.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow)) }
+            textOffset.animateTo(0f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow))
+        }
+    }
+
+    Row(
+        modifier = modifier
+            .widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp * iPhi)
+            .fillMaxWidth()
+            .height(56.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // --- Previous Button (Satellite) ---
+        Box(
+            modifier = Modifier.fillMaxHeight().sq(),
+            contentAlignment = Alignment.Center
+        ) {
+            ArrowButton(
+                modifier = Modifier.fillMaxSize(iPhi),
+                rotation = 360,
+                onClick = {
+                    animateDateChange(-1)
+                    onAction(ClepsydraScreenAction.OnPreviousDay)
+                }
+            )
+        }
+
+        Box(
+            modifier = Modifier.fillMaxWidth(iPhi).fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                onClick = { navController.navigate("calendar") },
+                modifier = Modifier.fillMaxSize(),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                tonalElevation = 6.dp,
+                shadowElevation = 6.dp
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().adaptivePadding(minPadding = 6.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val dateComp = st.dateText.split(" ")
+                    Text(
+                        text = "${dateComp[1]} ${dateComp[2]} ${dateComp[3]}",
+                        modifier = Modifier.weight(8f).wrapContentHeight()
+                            .offset(x = textOffset.value.dp)
+                            .scale(textScale.value)
+                            .rotate(textRotation.value)
+                            .alpha(textOpacity.value),
+                        maxLines = 1,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.titleLargeEmphasized,
+                        autoSize = TextAutoSize.StepBased(1.sp, stepSize = 0.001.sp)
+                    )
+                    Text(
+                        text = dateComp[0],
+                        modifier = Modifier.weight(5f).wrapContentHeight()
+                            .offset(x = textOffset.value.dp)
+                            .scale(textScale.value)
+                            .rotate(textRotation.value)
+                            .alpha(textOpacity.value),
+                        maxLines = 1,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.titleLargeEmphasized,
+                        color = LocalContentColor.current.copy(alpha = iPhi),
+                        autoSize = TextAutoSize.StepBased(1.sp, stepSize = 0.001.sp)
+                    )
+                }
+            }
+        }
+
+        // --- Next Button (Satellite) ---
+        Box(
+            modifier = Modifier.fillMaxHeight().sq(),
+            contentAlignment = Alignment.Center
+        ) {
+            ArrowButton(
+                modifier = Modifier.fillMaxSize(iPhi),
+                rotation = 180,
+                onClick = {
+                    animateDateChange(1)
+                    onAction(ClepsydraScreenAction.OnNextDay)
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ClepsydraScope.ArrowButton(
+    modifier: Modifier = Modifier,
+    rotation: Int,
+    onClick: () -> Unit
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+
+    // Animate scale: shrink slightly when pressed (inverse phi effect)
+    val targetScale = if (pressed) iPhi else 1f
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow)
+    )
+
+    Box(
+        modifier = modifier
+            .scale(scale)
+            .shadow(4.dp, MaterialShapes.Arrow.toShape(rotation))
+            .clip(MaterialShapes.Arrow.toShape(rotation))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {}
+}
+
+// ============================================================================
 // VISUAL EFFECTS & BACKGROUND
 // ============================================================================
+
 data class Droplet(
     val progress: Float,
     val x: Float,
