@@ -5,5 +5,6 @@ data class Settings(
     val isFirstClepsydra: Boolean = true,
     val theme: String = "rain",
     val fontSize: Int = 1,
-    val uiScale: Float = 1.0f
+    val uiScale: Float = 1.0f,
+    val isMobile: Boolean = false
 )

@@ -15,12 +15,13 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
-import oqk.ananke.clepsydrae.clepsydrae.data.toTimeMark
+import oqk.ananke.clepsydrae.core.toTimeMark
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.ClepsydraRepository
 import oqk.ananke.clepsydrae.clepsydrae.domain.end
 import oqk.ananke.clepsydrae.clepsydrae.domain.invertiDiatesi
 import oqk.ananke.clepsydrae.core.NotificationManager
+import oqk.ananke.clepsydrae.journal.domain.Journal
 import oqk.ananke.clepsydrae.journal.domain.formatDate
 import oqk.ananke.clepsydrae.journal.domain.JournalRepository
 import oqk.ananke.clepsydrae.journal.domain.endOfDay
@@ -33,15 +34,24 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+
+sealed interface ClepsydraSideEffect {
+    data class ShowPomodoroNotification(val clepsydra: Clepsydra) : ClepsydraSideEffect
+}
+
 @OptIn(ExperimentalTime::class)
 class ClepsydraScreenViewModel(
     private val clepsydraRepository: ClepsydraRepository,
     private val settingsRepository: SettingsRepository,
-    private val journalRepository: JournalRepository,
-    private val notificationManager: NotificationManager
+    private val journalRepository: JournalRepository
     ) : ViewModel() {
     private val _state = MutableStateFlow(ClepsydraScreenState())
     val state = _state.asStateFlow()
+    
+    private val _effect = MutableSharedFlow<ClepsydraSideEffect>()
+    val effect = _effect.asSharedFlow()
     
     init {
         loadDate(Clock.System.todayIn(TimeZone.currentSystemDefault()))
@@ -122,23 +132,22 @@ class ClepsydraScreenViewModel(
                 }
 
                 _state.update {
-                    val fin = listOfNotNull(cc.finHours, cc.finMinutes, cc.finSeconds)
-                        .reduceOrNull { acc, d -> acc + d }
-                        ?.takeIf { value -> value > Duration.ZERO }
-
-                    val init = listOfNotNull(cc.initHours, cc.initMinutes, cc.initSeconds)
-                        .reduceOrNull { acc, d -> acc + d }?.takeIf { value -> value >= Duration.ZERO }
-
                     it.copy(
-                        coreClepsydra =
-                        Clepsydra(
+                        coreClepsydra = oqk.ananke.clepsydrae.clepsydrae.domain.CreateClepsydraUseCase()(
                             name = cc.name,
                             note = cc.note,
                             tags = cc.tags,
-                            init = cc.init ?: (cc.now + (init ?: Duration.ZERO)),
-                            pomodoroPassive = cc.passiveGoal,
-                            pomodoroActive = cc.activeGoal,
-                            fin = cc.fin ?: fin?.let { duration -> (cc.init ?: (cc.now + (init ?: Duration.ZERO))) + duration },
+                            now = cc.now,
+                            initHours = cc.initHours,
+                            initMinutes = cc.initMinutes,
+                            initSeconds = cc.initSeconds,
+                            passiveGoal = cc.passiveGoal,
+                            activeGoal = cc.activeGoal,
+                            initOverride = cc.init,
+                            finHours = cc.finHours,
+                            finMinutes = cc.finMinutes,
+                            finSeconds = cc.finSeconds,
+                            finOverride = cc.fin
                         )
                     )
                 }
@@ -211,7 +220,7 @@ class ClepsydraScreenViewModel(
             is ClepsydraScreenAction.OnPomodoroThresholdCrossed -> {
                 _state.update { it.copy(pomodoroNotifying = true) }
                 viewModelScope.launch {
-                    notificationManager.sendPomodoroNotification(state.value.coreClepsydra!!)
+                    _effect.emit(ClepsydraSideEffect.ShowPomodoroNotification(state.value.coreClepsydra!!))
                     delay(1.minutes)
                     _state.update { it.copy(pomodoroNotifying = false) }
                 }
@@ -252,12 +261,18 @@ class ClepsydraScreenViewModel(
                     if(_state.value.journalOfDay.entryAtInterval.containsKey(action.time))
                         journalRepository.updateEntry(currentDate, action.time, action.entry.second, action.entry.first)
                     else journalRepository.insertEntry(currentDate, action.time,action.entry.second, action.entry.first)
-                    loadJournalOfDay()
+                    loadJournalOfDay(currentDate)
                 }
             }
             is ClepsydraScreenAction.OnSetTags -> {}
             is ClepsydraScreenAction.OnToggleShowJournal -> {
                 _state.update { it.copy(showJournal = action.show) }
+            }
+
+            ClepsydraScreenAction.ReloadJournal -> {
+                val currentDate = _state.value.currentLocalDate ?: Clock.System.todayIn(TimeZone.currentSystemDefault())
+                _state.update { it.copy(journalOfDay = Journal(currentDate)) }
+                loadJournalOfDay(currentDate)
             }
         }
     }

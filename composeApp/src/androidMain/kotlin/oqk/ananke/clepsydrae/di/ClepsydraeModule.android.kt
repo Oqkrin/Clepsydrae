@@ -16,6 +16,7 @@ import oqk.ananke.clepsydrae.settings.domain.SettingsRepository
 import oqk.ananke.clepsydrae.settings.presentation.SettingsScreenViewModel
 
 actual fun platformModule(notificationManager: NotificationManager) = module {
+    single<isMobile> { true }
     single { DriverFactory(androidContext()) }
     single { createDatabase(get()) }
     single<SettingsRepository> { SettingsRepositoryImpl(get()) }
@@ -25,7 +26,6 @@ actual fun platformModule(notificationManager: NotificationManager) = module {
     factory { ClepsydraScreenViewModel(
         clepsydraRepository = get(),
         settingsRepository = get(),
-        notificationManager = get(),
         journalRepository = get()
     ) }
     factory { SettingsScreenViewModel(get()) }

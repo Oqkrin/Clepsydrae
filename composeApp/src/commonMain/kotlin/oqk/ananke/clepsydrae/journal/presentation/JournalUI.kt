@@ -7,16 +7,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -33,21 +34,54 @@ import kotlin.time.ExperimentalTime
 fun ClepsydraScope.ClepsydraJournal(modifier: Modifier = Modifier) {
     val timelineItems = remember(st.journalOfDay) { st.journalOfDay.buildTimeline() }
 
-    ElevatedCard(Modifier.widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp).adaptivePadding(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = iPhi)),) {
-        LazyColumn(
-            modifier = modifier.fillMaxSize().adaptivePadding(),
-            contentPadding = PaddingValues(16.dp, 24.dp, 16.dp, 80.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(timelineItems, key = { it.time }) { item ->
-                TimelineEntry(
-                    item = item,
-                    onUpdate = { text, end ->
-                        onAction(ClepsydraScreenAction.OnSetEntryAtTime(item.time, text to end))
-                    },
-                    onDelete = { onAction(ClepsydraScreenAction.OnDeleteEntryAtTime(item.time)) }
-                )
+    Card(Modifier.widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp).adaptivePadding(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = iPhi)),) {
+        Box {
+            LazyColumn(
+                modifier = modifier.fillMaxSize().adaptivePadding(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                var lastEndTime: String? = null
+                items(timelineItems, key = { it.time }) { item ->
+                    val isExistingEntry = item is TimelineItem.ExistingEntry
+
+                    lastEndTime = if (item is TimelineItem.ExistingEntry) item.endTime else null
+
+
+                    ClepsydraTimeButton(time = item.time, isStartTime = isExistingEntry)
+                    if(isExistingEntry) {
+                        val entryTextFieldState = rememberTextFieldState(item.content)
+                        Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = CircleShape) {
+                            BasicTextField(entryTextFieldState, modifier = Modifier.padding(8.dp),
+                                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSecondaryContainer),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.secondary),
+
+                            )
+                        }
+                    }
+
+                    /*
+                    TimelineEntry(
+                        item = item,
+                        lastEndTime,
+                        onUpdate = { text, end ->
+                            onAction(ClepsydraScreenAction.OnSetEntryAtTime(item.time, text to end))
+                        },
+                        onDelete = { onAction(ClepsydraScreenAction.OnDeleteEntryAtTime(item.time)) }
+                    )
+                     */
+                }
             }
+
+            SmallFloatingActionButton(
+                onClick = { onAction(ClepsydraScreenAction.ReloadJournal) },
+                shape = CircleShape,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            ) {
+                Icon(Icons.Default.Loop, "reload", modifier = Modifier.size(24.dp))
+            }
+
         }
     }
 }
@@ -55,6 +89,7 @@ fun ClepsydraScope.ClepsydraJournal(modifier: Modifier = Modifier) {
 @Composable
 fun ClepsydraScope.TimelineEntry(
     item: TimelineItem,
+    lastEndTime: String?,
     onUpdate: (String, String?) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -163,29 +198,7 @@ fun ClepsydraScope.TimelineEntry(
                 if (endTime == null) {
                     EndTimeButton(item.time, endTime) { onUpdate(text, it) }
                 } else {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        tonalElevation = 2.dp
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Icons.Default.Check, null, Modifier.size(14.dp))
-                            Text(
-                                endTime.take(5),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                endTime.takeLast(3),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.6f)
-                            )
-                        }
-                    }
+                    ClepsydraTimeButton(time = endTime, isStartTime = false)
                 }
 
                 IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
@@ -220,21 +233,11 @@ fun ClepsydraScope.EndTimeButton(startTime: TimeStamp, endTime: String?, onSet: 
         }
     }
 
-    Surface(
+    ClepsydraTimeButton(
+        time = endTime ?: "Set end time",
+        isStartTime = false,
         onClick = { showDialog = true },
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        tonalElevation = 2.dp
-    ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(Icons.Default.Done, null, Modifier.size(16.dp))
-            Text("Finish", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        }
-    }
+    )
 
     if (showDialog) {
         TimePickerDialog(
@@ -275,5 +278,19 @@ fun TimePickerDialog(state: TimePickerState, onDismiss: () -> Unit, onConfirm: (
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ClepsydraTimeButton(modifier: Modifier = Modifier, isStartTime: Boolean, time: String, onClick: () -> Unit = {}) {
+    Surface(
+        modifier = modifier.padding(2.dp),
+        shape = CircleShape,
+        color = if (isStartTime) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer,
+        shadowElevation = 6.dp,
+        onClick = onClick
+    ) {
+        Text(modifier = Modifier.padding(8.dp), text = time, style = MaterialTheme.typography.labelLargeEmphasized)
     }
 }

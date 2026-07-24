@@ -1,7 +1,6 @@
 package oqk.ananke.clepsydrae.journal.domain
 
 import kotlinx.datetime.LocalDate
-import java.util.TreeMap
 import kotlin.time.ExperimentalTime
 
 typealias TimeStamp = String
@@ -27,7 +26,7 @@ sealed interface TimelineItem {
 
 data class Journal @OptIn(ExperimentalTime::class) constructor(
     val day: LocalDate?,
-    val entryAtInterval: MutableMap<TimeStamp, Pair<String, TimeStamp?>> = TreeMap()
+    val entryAtInterval: MutableMap<TimeStamp, Pair<String, TimeStamp?>> = mutableMapOf()
 ) {
     // ... constructors and toString
 

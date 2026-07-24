@@ -158,7 +158,7 @@ fun SettingsScope.SettingsContent(modifier: Modifier = Modifier, navController: 
                 Slider(
                     value = st.settings.fontSize.toFloat(),
                     onValueChange = { onAction(SettingsAction.SetFontSize(it.toInt())) },
-                    valueRange = 0f..20f,
+                    valueRange = 1f..20f,
                     steps = 19
                 )
             }

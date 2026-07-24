@@ -44,6 +44,7 @@ sealed interface ClepsydraScreenAction {
     data class OnToggleShowJournal(val show: Boolean = true): ClepsydraScreenAction
     data object OnFirstClepsydraCreation: ClepsydraScreenAction
     data object OnFirstClepsydraCreationOnResult: ClepsydraScreenAction
+    data object ReloadJournal: ClepsydraScreenAction
     data object OnCloseCoreClepsydra : ClepsydraScreenAction
     data object ToggleDiatesi : ClepsydraScreenAction
     data object ToggleHistory : ClepsydraScreenAction

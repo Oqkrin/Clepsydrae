@@ -46,7 +46,7 @@ fun main() = application {
         val monitorSize by mutableStateOf(getMonitorSize())
         clepsydraeWindowState.compactSize = remember(monitorSize) { monitorSize.minSquared() / 2 * phi }
 
-        ClepsydraeApp(JvmNotificationManager(trayState)) {
+        ClepsydraeApp(JvmNotificationManager(trayState), false) {
             MainContent(
                 windowSizeClass = LocalSizeInfo.current.sizeClass,
                 clepsydraeWindowState = clepsydraeWindowState,

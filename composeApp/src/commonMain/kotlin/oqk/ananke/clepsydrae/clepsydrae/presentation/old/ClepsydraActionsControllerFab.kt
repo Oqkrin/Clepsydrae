@@ -1,4 +1,4 @@
-package oqk.ananke.clepsydrae.clepsydrae.presentation
+package oqk.ananke.clepsydrae.clepsydrae.presentation.old
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -32,7 +32,6 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -67,6 +66,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.asText
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScope
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenAction
 import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.core.phi
 import kotlin.math.roundToInt

@@ -12,7 +12,7 @@
             enableEdgeToEdge()
             super.onCreate(savedInstanceState)
             setContent {
-                ClepsydraeApp(notificationManager = AndroidNotificationManager(LocalContext.current))
+                ClepsydraeApp(notificationManager = AndroidNotificationManager(LocalContext.current), true)
             }
         }
     }

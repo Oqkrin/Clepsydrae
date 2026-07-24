@@ -11,6 +11,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
+import oqk.ananke.clepsydrae.core.TimeScope
+import oqk.ananke.clepsydrae.core.toTimeMark
 
 class ClepsydraRepositoryImpl(private val database: Database) : ClepsydraRepository {
 
@@ -102,22 +104,7 @@ class ClepsydraRepositoryImpl(private val database: Database) : ClepsydraReposit
 
 }
 
-@OptIn(ExperimentalTime::class)
-class TimeScope {
-    val now: Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
-    val mark: TimeMark = TimeSource.Monotonic.markNow()
-    fun Long.toTimeMark(): TimeMark = mark - (now - this).milliseconds
-    fun TimeMark.toEpochMillis(): Long = now - elapsedNow().inWholeMilliseconds
-}
 
-@OptIn(ExperimentalTime::class)
-fun Long.toTimeMark(): TimeMark {
-    val offset = (kotlin.time.Clock.System.now().toEpochMilliseconds() - this).milliseconds
-    return TimeSource.Monotonic.markNow() - offset
-}
-
-@OptIn(ExperimentalTime::class)
-fun TimeMark.toEpochMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds() - elapsedNow().inWholeMilliseconds
 
 fun Long.toBool(): Boolean = this != 0L
 fun Boolean.toBooleanLong(): Long = if (this) 1L else 0L

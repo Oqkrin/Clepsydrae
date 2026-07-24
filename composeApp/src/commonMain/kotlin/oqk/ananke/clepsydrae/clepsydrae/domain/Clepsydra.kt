@@ -3,7 +3,7 @@ package oqk.ananke.clepsydrae.clepsydrae.domain
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.todayIn
-import oqk.ananke.clepsydrae.clepsydrae.data.toTimeMark
+import oqk.ananke.clepsydrae.core.toTimeMark
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime

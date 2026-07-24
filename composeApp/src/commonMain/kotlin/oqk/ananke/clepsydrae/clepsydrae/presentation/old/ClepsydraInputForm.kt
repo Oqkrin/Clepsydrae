@@ -1,4 +1,4 @@
-package oqk.ananke.clepsydrae.clepsydrae.presentation
+package oqk.ananke.clepsydrae.clepsydrae.presentation.old
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -37,9 +37,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +44,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.asTimeMarkFromStartOfDay
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScope
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenAction
 import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.core.iPhi
 import oqk.ananke.clepsydrae.journal.presentation.TimePickerDialog

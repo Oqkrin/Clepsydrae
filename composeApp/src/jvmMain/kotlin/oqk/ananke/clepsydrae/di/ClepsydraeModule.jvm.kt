@@ -14,6 +14,7 @@ import oqk.ananke.clepsydrae.settings.presentation.SettingsScreenViewModel
 import org.koin.dsl.module
 
 actual fun platformModule(notificationManager: NotificationManager) = module {
+    single<isMobile> { false }
     single { DriverFactory() }
     single { createDatabase(get()) }
     single<SettingsRepository> { SettingsRepositoryImpl(get()) }
@@ -23,8 +24,7 @@ actual fun platformModule(notificationManager: NotificationManager) = module {
     factory { ClepsydraScreenViewModel(
         clepsydraRepository = get(),
         settingsRepository = get(),
-        journalRepository = get(),
-        notificationManager = get()
+        journalRepository = get()
     ) }
     factory { SettingsScreenViewModel(get()) }
 }

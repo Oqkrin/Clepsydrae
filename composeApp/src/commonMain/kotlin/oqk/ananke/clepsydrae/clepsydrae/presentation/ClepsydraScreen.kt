@@ -1,5 +1,7 @@
 package oqk.ananke.clepsydrae.clepsydrae.presentation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.animation.expandIn
 import androidx.compose.animation.expandVertically
@@ -8,12 +10,10 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -32,43 +32,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.graphics.shapes.CornerRounding
-import androidx.graphics.shapes.Morph
-import androidx.graphics.shapes.RoundedPolygon
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
-import kotlinx.coroutines.Delay
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import oqk.ananke.clepsydrae.clepsydrae.domain.asText
 import oqk.ananke.clepsydrae.clepsydrae.domain.shouldNotifyPomodoro
 import oqk.ananke.clepsydrae.clepsydrae.domain.strlapsed
 import oqk.ananke.clepsydrae.core.*
-import oqk.ananke.clepsydrae.journal.domain.TimelineItem
 import oqk.ananke.clepsydrae.journal.presentation.ClepsydraJournal
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.sqrt
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-
 interface ClepsydraScope : ScreenScope<ClepsydraScreenState, ClepsydraScreenAction>
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -84,6 +72,17 @@ fun ClepsydraScreen(navController: NavController) {
     val sz = LocalSizeInfo.current.sizes
     val uiScale = LocalSettings.current.uiScale
     val isFirst = LocalSettings.current.isFirstClepsydra
+
+    val notificationManager: NotificationManager = org.koin.compose.koinInject()
+    LaunchedEffect(vw) {
+        vw.effect.collect { effect ->
+            when (effect) {
+                is ClepsydraSideEffect.ShowPomodoroNotification -> {
+                    notificationManager.sendPomodoroNotification(effect.clepsydra)
+                }
+            }
+        }
+    }
 
     val scope = retain(ws, sz, st) {
         object : ClepsydraScope {
@@ -138,20 +137,19 @@ fun ClepsydraScreen(navController: NavController) {
                 // Main Content Area
                 Box(Modifier.weight(1f)) {
                     WaterDroplets()
-                    
-                    Box(Modifier.fillMaxSize().padding(horizontal = if (isNarrow && !isShort) 16.dp else 0.dp)) {
-                        st.coreClepsydra?.let {
-                            MorphingTimer(Modifier.align(Alignment.Center))
-                            SmallFloatingActionButton(
-                                modifier = Modifier
-                                    .align(if (!isShort) Alignment.BottomCenter else Alignment.BottomEnd)
-                                    .adaptivePadding(),
-                                onClick = { onAction(ClepsydraScreenAction.OnCloseCoreClepsydra) },
-                            ) {
-                                Icon(Icons.Default.Close, "Close")
-                            }
-                        } ?: ClepsydraInputFormV2(modifier = Modifier.align(Alignment.BottomCenter))
 
+                    Box(
+                        Modifier.fillMaxSize()
+                            .padding(horizontal = if (isNarrow && !isShort) 4.dp else 0.dp, vertical = 16.dp)
+                    ) {
+                        st.coreClepsydra?.let {
+                            MorphingTimer(Modifier.align(Alignment.TopCenter))
+                        } ?: ClepsydraInputFormV2(modifier = Modifier.align(Alignment.BottomCenter)
+                            .padding(
+                                start = 4.dp,
+                                end = if(!isNarrow) 96.dp+4.dp else 4.dp,
+                                bottom = if(isNarrow) 72.dp else 0.dp ))
+                        //androidx.compose.animation.AnimatedVisibility
                         androidx.compose.animation.AnimatedVisibility(
                             st.showJournal,
                             modifier = Modifier.align(Alignment.Center),
@@ -163,40 +161,43 @@ fun ClepsydraScreen(navController: NavController) {
                         }
                     }
 
-                    if(!isNarrow)  {
-                        ClepsydraNavigationBar(
-                            Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 16.dp)
-                                .fillMaxHeight(iPhi)
-                        )
-                    }
+                    Column(
+                        modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(bottom = 16.dp, end = 16.dp).align(Alignment.BottomCenter),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (isShort) {
+                            SmallFloatingActionButton(
+                                modifier = Modifier
+                                    .align(Alignment.End),
+                                onClick = { navController.navigate("settings") }
+                            ) {
+                                Icon(Icons.Default.Settings, "Settings")
+                            }
+                            Spacer(Modifier.weight(1f))
+                        }
+                        if (!isNarrow) {
+                            ClepsydraNavigationBar(
+                                Modifier
+                                    .align(Alignment.End)
+                                    .fillMaxHeight(iPhi)
+                            )
+                        }
 
-                    if (isShort) {
-                        SmallFloatingActionButton(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 16.dp, end = 16.dp),
-                            onClick = { navController.navigate("settings") }
+                        Row(
+                            modifier = Modifier.align(Alignment.End).heightIn(max = if(isShort) 48.dp else 56.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Icon(Icons.Default.Settings, "Settings")
+                            if (isNarrow && isShort) {
+                                ClepsydraNavigationBar(modifier = Modifier.weight(1f))
+                            }
+                            ClepsydraTimeBar(modifier = Modifier.height(56.dp))
                         }
+
+                        if (isNarrow && !isShort) ClepsydraNavigationBar(modifier = Modifier.padding(start = 16.dp))
                     }
-                }
-
-                Column (modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 16.dp) , verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally ) {
-
-                    Row(modifier = Modifier.align(Alignment.End).padding(start = 8.dp, end = 16.dp), verticalAlignment = Alignment.Bottom) {
-
-                        if(isNarrow && isShort) {
-                            ClepsydraNavigationBar(modifier = Modifier.weight(1f))
-                            Spacer(Modifier.size(2.dp))
-                        }
-                        ClepsydraTimeBar(modifier = Modifier.height(64.dp))
-                    }
-
-                    Spacer(modifier = Modifier.height(8.adp()))
-                    if(isNarrow && !isShort) ClepsydraNavigationBar(modifier = Modifier.padding(horizontal = 16.dp))
                 }
 
 
@@ -230,7 +231,7 @@ private fun ClepsydraScope.ClepsydraNavigationBar(modifier: Modifier = Modifier)
     )
 
     Card(
-        shape = RoundedCornerShape(37),
+        shape = RoundedCornerShape(40),
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
@@ -248,7 +249,7 @@ private fun ClepsydraScope.ClepsydraNavigationBar(modifier: Modifier = Modifier)
                             selectedItem = i
                             onAction(ClepsydraScreenAction.OnToggleShowJournal(i == 0))
                         },
-                        icon = { Icon(if (i == selectedItem) selectedIcons[i] else unselectedIcons[i], label) },
+                        icon = { Icon(if (i == selectedItem) selectedIcons[i] else unselectedIcons[i], label, modifier = Modifier.size(if(isShort) 14.dp else 24.dp)) },
                         colors = itemColors,
                         alwaysShowLabel = !(isNarrow && isShort)
                     )
@@ -257,7 +258,7 @@ private fun ClepsydraScope.ClepsydraNavigationBar(modifier: Modifier = Modifier)
         } else {
             NavigationRail(
                 containerColor = NavigationBarDefaults.containerColor.copy(iPhi),
-                modifier = Modifier.width(80.dp)
+                modifier = Modifier.width(64.dp)
             ) {
                 Column(
                     Modifier.fillMaxHeight(),
@@ -314,19 +315,11 @@ private fun ClepsydraScope.ClepsydraNavigationBar(modifier: Modifier = Modifier)
 fun ClepsydraScope.MorphingTimer(modifier: Modifier = Modifier) {
     val clepsydra = st.coreClepsydra ?: return
 
-    val colors = MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.inversePrimary
-    val color by remember(clepsydra.isActive) {
-        derivedStateOf { if (clepsydra.isActive) colors.first else colors.second }
-    }
-    var elapsed by remember { mutableStateOf("00:00") }
-    val morphProgress by animateFloatAsState(
-        targetValue = if (clepsydra.isActive) 1f else 0f,
+    val color by animateColorAsState(
+        targetValue = if (clepsydra.isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
     )
-    val scale by animateFloatAsState(
-        targetValue = if (clepsydra.isActive) 1.05f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessVeryLow)
-    )
+    var elapsed by remember { mutableStateOf("00:00") }
 
     LaunchedEffect(clepsydra.lastStateChange) {
         while (true) {
@@ -338,68 +331,6 @@ fun ClepsydraScope.MorphingTimer(modifier: Modifier = Modifier) {
         }
     }
 
-    val downDrop = remember {
-        RoundedPolygon(
-            vertices = floatArrayOf(0.5f, 0.9f, 0.85f, 0.4f, 0.5f, 0.1f, 0.15f, 0.4f),
-            perVertexRounding = listOf(
-                CornerRounding(0.01f),
-                CornerRounding(0.5f),
-                CornerRounding(0.5f),
-                CornerRounding(0.5f)
-            ),
-            centerX = 0.5f,
-            centerY = 0.5f
-        )
-    }
-
-    val upDrop = remember {
-        RoundedPolygon(
-            vertices = floatArrayOf(0.5f, 0.1f, 0.15f, 0.6f, 0.5f, 0.9f, 0.85f, 0.6f),
-            perVertexRounding = listOf(
-                CornerRounding(0.01f),
-                CornerRounding(0.5f),
-                CornerRounding(0.5f),
-                CornerRounding(0.5f)
-            ),
-            centerX = 0.5f,
-            centerY = 0.5f
-        )
-    }
-
-    val matrix = remember { Matrix() }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .aspectRatio(1f, !isPortrait)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .drawWithCache {
-                val morph = Morph(start = upDrop, end = downDrop)
-                val morphPath = morph.toPath(progress = morphProgress)
-                matrix.reset()
-                matrix.scale(size.minDimension, size.minDimension)
-                matrix.translate(
-                    (size.width - size.minDimension) / 2f,
-                    (size.height - size.minDimension) / 2f
-                )
-                morphPath.transform(matrix)
-
-                onDrawBehind { drawPath(morphPath, color = color) }
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        TimerContent(elapsed)
-    }
-}
-
-@Composable
-fun ClepsydraScope.TimerContent(elapsed: String) {
-    val clepsydra = st.coreClepsydra ?: return
-
-    // Subtle pulse animation for the timer
     val pulse by animateFloatAsState(
         targetValue = if (clepsydra.isActive) 1.02f else 1f,
         animationSpec = spring(
@@ -408,58 +339,122 @@ fun ClepsydraScope.TimerContent(elapsed: String) {
         )
     )
 
-    Column(
-        modifier = Modifier
-            .padding(16.dp)
-            .graphicsLayer {
-                scaleX = pulse
-                scaleY = pulse
-            },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            TextField(
-                value = clepsydra.name ?: "",
-                onValueChange = { onAction(ClepsydraScreenAction.OnSetName(it)) },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Light),
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent
-                ),
-                modifier = Modifier.widthIn(max = 180.dp)
-            )
+    Column(modifier) {
+
+
+        Box(Modifier.weight(iPhi)) { }
+
+        Box(Modifier.weight(phi)) {
+            Surface(
+                modifier = Modifier.sq()
+                    .clip(CircleShape),
+                shape = CircleShape,
+                color = color,
+                shadowElevation = 6.dp,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize(0.8f)
+                        .graphicsLayer {
+                            scaleX = pulse
+                            scaleY = pulse
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (!clepsydra.isActive) {
+                        IconButton(
+                            modifier = Modifier.size(24.dp),
+                            onClick = { onAction(ClepsydraScreenAction.OnCloseCoreClepsydra) }) {
+                            Icon(Icons.Default.Close, "Close")
+                        }
+                    } else {
+                        Spacer(Modifier.size(24.dp))
+                    }
+
+
+                    TonalToggleButton(
+                        modifier = Modifier.fillMaxHeight(.3f),
+                        checked = clepsydra.isActive,
+                        onCheckedChange = { onAction(ClepsydraScreenAction.ToggleDiatesi) },
+                        colors = ToggleButtonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary,
+                            contentColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            disabledContainerColor = MaterialTheme.colorScheme.surface,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurface,
+                            checkedContainerColor = MaterialTheme.colorScheme.primary,
+                            checkedContentColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Row(modifier = Modifier.fillMaxWidth(iPhi), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = elapsed.take(2),
+                                style = MaterialTheme.typography.labelSmallEmphasized,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(phi),
+                                autoSize = TextAutoSize.StepBased(1.sp, stepSize = 0.001.sp)
+                            )
+                            ClepsydraTimerSeparator(Modifier.weight(iPhi).fillMaxHeight(.75f), clepsydra.isActive)
+
+                            if (elapsed.length == 8) {
+                                Text(
+                                    text = elapsed.substring(3, 5),
+                                    style = MaterialTheme.typography.displayLargeEmphasized,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(phi),
+                                    autoSize = TextAutoSize.StepBased(1.sp, stepSize = 0.001.sp)
+
+                                )
+                                ClepsydraTimerSeparator(Modifier.weight(iPhi).fillMaxHeight(.75f), clepsydra.isActive)
+                            }
+                            Text(
+                                text = elapsed.takeLast(2),
+                                style = MaterialTheme.typography.labelSmallEmphasized,
+                                maxLines = 1,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(phi),
+                                autoSize = TextAutoSize.StepBased(1.sp, stepSize = 0.001.sp)
+                            )
+                        }
+                    }
+
+                    if (clepsydra.isActive) {
+                        IconButton(
+                            modifier = Modifier.size(24.dp),
+                            onClick = { onAction(ClepsydraScreenAction.OnCloseCoreClepsydra) }) {
+                            Icon(Icons.Default.Close, "Close")
+                        }
+                    } else {
+                        Spacer(Modifier.size(24.dp))
+                    }
+                }
+            }
         }
 
-        Text(
-            text = elapsed,
-            style = MaterialTheme.typography.displayLarge,
-            fontWeight = FontWeight.Light,
-            color = if (!st.pomodoroNotifying) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.error
+        Box(Modifier.weight(iPhi)) { }
+    }
+}
+
+@Composable
+private fun ClepsydraTimerSeparator(modifier: Modifier = Modifier, isActive: Boolean) {
+    Column(modifier, verticalArrangement = Arrangement.SpaceAround) {
+        Icon(
+            if (isActive) Icons.Default.PlayArrow else Icons.Default.Stop,
+            "player",
+            Modifier.weight(1f)
         )
-        IconButton(onClick = { onAction(ClepsydraScreenAction.ToggleDiatesi) }) {
-            Icon(
-                imageVector = if (clepsydra.isActive) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (clepsydra.isActive) "Pause" else "Play",
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-        }
+        Icon(
+            if (isActive) Icons.Default.PlayArrow else Icons.Default.Stop,
+            "player",
+            Modifier.weight(1f)
+        )
     }
 }
 
 // ============================================================================
 // INPUT & TIME BAR COMPONENTS
 // ============================================================================
-
-@Composable
-fun ClepsydraScope.ClepsydraInputFormV2(modifier: Modifier) {
-    // TODO: Implement input form UI
-}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -509,9 +504,9 @@ fun ClepsydraScope.ClepsydraTimeBar(modifier: Modifier = Modifier) {
             ) } },
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-            onAction(ClepsydraScreenAction.OnCreateNoteAtTime(nowText)) }
+            onAction(ClepsydraScreenAction.OnCreateNoteAtTime(nowText))
+        }
     )
-
 }
 
 // ============================================================================
@@ -552,7 +547,7 @@ private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
         modifier = modifier
             .widthIn(max = WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND.dp * iPhi)
             .fillMaxWidth()
-            .height(56.dp),
+            .height(64.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -562,7 +557,7 @@ private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center
         ) {
             ArrowButton(
-                modifier = Modifier.fillMaxSize(iPhi),
+                modifier = Modifier.size(48.dp),
                 rotation = 360,
                 onClick = {
                     animateDateChange(-1)
@@ -572,26 +567,26 @@ private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
         }
 
         Box(
-            modifier = Modifier.fillMaxWidth(iPhi).fillMaxHeight(),
+            modifier = Modifier.height(56.dp),
             contentAlignment = Alignment.Center
         ) {
             Surface(
                 onClick = { navController.navigate("calendar") },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier,
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
-                tonalElevation = 6.dp,
                 shadowElevation = 6.dp
             ) {
+
                 Column(
-                    modifier = Modifier.fillMaxSize().adaptivePadding(minPadding = 6.dp),
+                    modifier = Modifier.padding(vertical = 4.dp, horizontal = 24.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     val dateComp = st.dateText.split(" ")
                     Text(
-                        text = "${dateComp[1]} ${dateComp[2]} ${dateComp[3]}",
-                        modifier = Modifier.weight(8f).wrapContentHeight()
+                        text = dateComp[0],
+                        modifier = Modifier.weight(7f).wrapContentHeight()
                             .offset(x = textOffset.value.dp)
                             .scale(textScale.value)
                             .rotate(textRotation.value)
@@ -602,7 +597,7 @@ private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
                         autoSize = TextAutoSize.StepBased(1.sp, stepSize = 0.001.sp)
                     )
                     Text(
-                        text = dateComp[0],
+                        text = "${dateComp[1]} ${dateComp[2]} ${dateComp[3]}",
                         modifier = Modifier.weight(5f).wrapContentHeight()
                             .offset(x = textOffset.value.dp)
                             .scale(textScale.value)
@@ -624,7 +619,7 @@ private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
             contentAlignment = Alignment.Center
         ) {
             ArrowButton(
-                modifier = Modifier.fillMaxSize(iPhi),
+                modifier = Modifier.size(48.dp),
                 rotation = 180,
                 onClick = {
                     animateDateChange(1)
