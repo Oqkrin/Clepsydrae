@@ -44,7 +44,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.asTimeMarkFromStartOfDay
-import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScope
+import oqk.ananke.clepsydrae.calendar.presentation.ClepsydraScope
 import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenAction
 import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.core.iPhi

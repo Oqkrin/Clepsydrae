@@ -10,32 +10,33 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.WindowState
 
-class ClepsydraeWindowState(private val windowState: WindowState) {
+class ClepsydraWindow(val state: WindowState) {
     var isAlwaysOnTop by mutableStateOf(false)
         private set
 
     private var restoreSize: DpSize? = null
     private var restorePosition: WindowPosition? = null
 
-    var compactSize = DpSize(300.dp, 300.dp)
+    var compactDp = 300.dp
+    var compactSize = DpSize(compactDp, compactDp)
 
     fun toggleCompactMode() {
         if(!isAlwaysOnTop) {
-            restoreSize = windowState.size
-            restorePosition = windowState.position
-            windowState.size = compactSize
+            restoreSize = state.size
+            restorePosition = state.position
+            state.size = compactSize
         } else {
-            restoreSize?.let { windowState.size = it }
-            restorePosition?.let { windowState.position = it }
+            restoreSize?.let { state.size = it }
+            restorePosition?.let { state.position = it }
         }
         isAlwaysOnTop = !isAlwaysOnTop
     }
 
-    fun minimize() { windowState.isMinimized = true }
+    fun minimize() { state.isMinimized = true }
 
 }
 
 @Composable
-fun rememberClepsydraeWindowState(windowState: WindowState): ClepsydraeWindowState {
-    return remember(windowState) { ClepsydraeWindowState(windowState) }
+fun rememberClepsydraeWindow(windowState: WindowState): ClepsydraWindow {
+    return remember(windowState) { ClepsydraWindow(windowState) }
 }

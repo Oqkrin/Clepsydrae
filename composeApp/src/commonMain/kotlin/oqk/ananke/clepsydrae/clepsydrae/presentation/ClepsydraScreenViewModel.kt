@@ -41,7 +41,6 @@ sealed interface ClepsydraSideEffect {
     data class ShowPomodoroNotification(val clepsydra: Clepsydra) : ClepsydraSideEffect
 }
 
-@OptIn(ExperimentalTime::class)
 class ClepsydraScreenViewModel(
     private val clepsydraRepository: ClepsydraRepository,
     private val settingsRepository: SettingsRepository,
@@ -71,7 +70,6 @@ class ClepsydraScreenViewModel(
 
     private var journalJob: Job? = null
     
-    @OptIn(ExperimentalTime::class)
     private fun loadClepsydraeForDate(localDate: LocalDate? = _state.value.currentLocalDate) {
         viewModelScope.launch {
             val list = clepsydraRepository.getClepsydraeByDate(localDate!!)
@@ -84,7 +82,6 @@ class ClepsydraScreenViewModel(
         }
     }
 
-    @OptIn(ExperimentalTime::class)
     private fun loadJournalOfDay(localDate: LocalDate? = _state.value.currentLocalDate) {
         // Cancel previous subscription if it exists
         journalJob?.cancel()
@@ -105,7 +102,6 @@ class ClepsydraScreenViewModel(
         }
     }
     
-    @OptIn(ExperimentalTime::class)
     fun onAction(action: ClepsydraScreenAction) {
         when (action) {
 

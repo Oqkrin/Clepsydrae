@@ -21,13 +21,8 @@ import org.koin.dsl.koinConfiguration
 @Composable
 fun ClepsydraeApp(
     notificationManager: NotificationManager,
-    isMobile: Boolean,
     clepsydraeScreenContent: @Composable () -> Unit = { ClepsydraeNavigation() }
 ) {
-    // Pass windowSizeClass to Koin if your module really needs it dynamically,
-    // otherwise prefer passing it via CompositionLocal or to specific Composables.
-
-
     KoinApplication(
         configuration = koinConfiguration(declaration = { modules(clepsydraeModule(notificationManager)) })
     ) {

@@ -66,7 +66,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import oqk.ananke.clepsydrae.clepsydrae.domain.Clepsydra
 import oqk.ananke.clepsydrae.clepsydrae.domain.asText
-import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScope
+import oqk.ananke.clepsydrae.calendar.presentation.ClepsydraScope
 import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenAction
 import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.core.phi

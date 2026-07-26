@@ -1,4 +1,4 @@
-package oqk.ananke.clepsydrae.clepsydrae.presentation
+package oqk.ananke.clepsydrae.calendar.presentation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -7,7 +7,6 @@ import androidx.compose.animation.expandIn
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,9 +15,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
@@ -38,8 +35,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEachIndexed
@@ -50,8 +47,15 @@ import kotlinx.coroutines.launch
 import oqk.ananke.clepsydrae.clepsydrae.domain.asText
 import oqk.ananke.clepsydrae.clepsydrae.domain.shouldNotifyPomodoro
 import oqk.ananke.clepsydrae.clepsydrae.domain.strlapsed
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraInputFormV2
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenAction
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenState
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenViewModel
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraSideEffect
+import oqk.ananke.clepsydrae.clepsydrae.presentation.NotificationPermissionPopUp
 import oqk.ananke.clepsydrae.core.*
 import oqk.ananke.clepsydrae.journal.presentation.ClepsydraJournal
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -59,9 +63,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 interface ClepsydraScope : ScreenScope<ClepsydraScreenState, ClepsydraScreenAction>
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ClepsydraScreen(navController: NavController) {
+fun DayScreen(navController: NavController) {
 
     /** Scope Creation **/
     val vw: ClepsydraScreenViewModel = koinViewModel()
@@ -73,7 +77,7 @@ fun ClepsydraScreen(navController: NavController) {
     val uiScale = LocalSettings.current.uiScale
     val isFirst = LocalSettings.current.isFirstClepsydra
 
-    val notificationManager: NotificationManager = org.koin.compose.koinInject()
+    val notificationManager: NotificationManager = koinInject()
     LaunchedEffect(vw) {
         vw.effect.collect { effect ->
             when (effect) {
@@ -599,7 +603,9 @@ private fun ClepsydraScope.ClepsydraCalendarBar(modifier: Modifier = Modifier) {
                     Text(
                         text = "${dateComp[1]} ${dateComp[2]} ${dateComp[3]}",
                         modifier = Modifier.weight(5f).wrapContentHeight()
-                            .offset(x = textOffset.value.dp)
+                            .offset {
+                                IntOffset(textOffset.value.toInt(), 0)
+                            }
                             .scale(textScale.value)
                             .rotate(textRotation.value)
                             .alpha(textOpacity.value),

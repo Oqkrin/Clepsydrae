@@ -1,21 +1,15 @@
 package oqk.ananke.clepsydrae
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.window.*
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
-import clepsydrae.composeapp.generated.resources.Res
-import clepsydrae.composeapp.generated.resources.allDrawableResources
 import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenAction
 import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenViewModel
 import oqk.ananke.clepsydrae.core.JvmNotificationManager
@@ -24,40 +18,34 @@ import oqk.ananke.clepsydrae.core.isShort
 import oqk.ananke.clepsydrae.core.minSquared
 import oqk.ananke.clepsydrae.core.phi
 import oqk.ananke.clepsydrae.navigation.ClepsydraeNavigation
-import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
 
-@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 fun main() = application {
 
-    val windowState = rememberWindowState()
-    val clepsydraeWindowState = rememberClepsydraeWindowState(windowState)
     val trayState = rememberTrayState()
-
+    val clepsydraeWindow = rememberClepsydraeWindow(rememberWindowState())
 
     Window(
         onCloseRequest = ::exitApplication,
         title = "Clepsydrae",
-        state = windowState,
+        state = clepsydraeWindow.state,
         undecorated = true,
-        alwaysOnTop = clepsydraeWindowState.isAlwaysOnTop
+        alwaysOnTop = clepsydraeWindow.isAlwaysOnTop
     ) {
 
         val monitorSize by mutableStateOf(getMonitorSize())
-        clepsydraeWindowState.compactSize = remember(monitorSize) { monitorSize.minSquared() / 2 * phi }
+        clepsydraeWindow.compactSize = remember(monitorSize) { monitorSize.minSquared() / 2 * phi }
 
-        ClepsydraeApp(JvmNotificationManager(trayState), false) {
+        ClepsydraeApp(JvmNotificationManager(trayState)) {
             MainContent(
                 windowSizeClass = LocalSizeInfo.current.sizeClass,
-                clepsydraeWindowState = clepsydraeWindowState,
+                clepsydraeWindow = clepsydraeWindow,
                 onClose = ::exitApplication
             )
 
-            val trayIcon = ColorPainter(MaterialTheme.colorScheme.primary) // Use your app's primary color
-
             Tray(
                 state = trayState,
-                icon = trayIcon, // No resource file needed!
+                icon = ColorPainter(MaterialTheme.colorScheme.primary),
                 menu = {
                     Item("Exit", onClick = ::exitApplication)
                 }
@@ -69,22 +57,21 @@ fun main() = application {
 @Composable
 fun FrameWindowScope.MainContent(
     windowSizeClass: WindowSizeClass,
-    clepsydraeWindowState: ClepsydraeWindowState,
+    clepsydraeWindow: ClepsydraWindow,
     onClose: () -> Unit
 ) {
     val viewModel: ClepsydraScreenViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     val navController = rememberNavController()
 
-    // Determine UI mode based on window height
 
     Column(modifier = Modifier.fillMaxSize()) {
         ClepsydraWindowTitleBar(
             title = if (windowSizeClass.isShort()) state.dateText else "Clepsydrae",
-            isAlwaysOnTop = clepsydraeWindowState.isAlwaysOnTop,
+            isAlwaysOnTop = clepsydraeWindow.isAlwaysOnTop,
             isCompact = windowSizeClass.isShort(),
-            onToggleAlwaysOnTop = clepsydraeWindowState::toggleCompactMode,
-            onMinimize = clepsydraeWindowState::minimize,
+            onToggleAlwaysOnTop = clepsydraeWindow::toggleCompactMode,
+            onMinimize = clepsydraeWindow::minimize,
             onClose = onClose,
             onNavigateCalendar = { navController.navigate("Calendar") },
             onPreviousDay = { viewModel.onAction(ClepsydraScreenAction.OnPreviousDay) },

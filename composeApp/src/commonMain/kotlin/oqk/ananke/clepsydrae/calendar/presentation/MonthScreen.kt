@@ -14,7 +14,7 @@ interface CalendarScope : ScreenScope<Unit, Unit>
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarScreen(navController: NavController) {
+fun MonthScreen(navController: NavController) {
     Scaffold(
         topBar = {
             TopAppBar(
