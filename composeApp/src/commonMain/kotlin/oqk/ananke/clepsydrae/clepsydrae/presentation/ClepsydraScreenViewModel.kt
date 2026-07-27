@@ -56,7 +56,6 @@ class ClepsydraScreenViewModel(
         loadDate(Clock.System.todayIn(TimeZone.currentSystemDefault()))
     }
 
-    @OptIn(ExperimentalTime::class)
     private fun loadDate(localDate: LocalDate) {
             _state.update { it.copy(
                 currentLocalDate = localDate,

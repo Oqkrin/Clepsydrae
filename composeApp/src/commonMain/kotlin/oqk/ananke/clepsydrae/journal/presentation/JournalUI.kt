@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.delay
-import oqk.ananke.clepsydrae.calendar.presentation.ClepsydraScope
+import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScope
 import oqk.ananke.clepsydrae.clepsydrae.presentation.ClepsydraScreenAction
 import oqk.ananke.clepsydrae.core.iPhi
 import oqk.ananke.clepsydrae.journal.domain.TimeStamp

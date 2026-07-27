@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import oqk.ananke.clepsydrae.navigation.Screen
 import androidx.window.core.layout.WindowSizeClass
 import oqk.ananke.clepsydrae.core.LocalSettings
 import oqk.ananke.clepsydrae.core.LocalSizeInfo
@@ -189,7 +190,7 @@ fun SettingsScope.SettingsContent(modifier: Modifier = Modifier, navController: 
         }
         
         Button(
-            onClick = { navController.navigate("statistics") },
+            onClick = { navController.navigate(Screen.STATS.name) },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Statistics")

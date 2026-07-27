@@ -31,9 +31,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import oqk.ananke.clepsydrae.calendar.presentation.ClepsydraScope
 import oqk.ananke.clepsydrae.di.isMobile
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt

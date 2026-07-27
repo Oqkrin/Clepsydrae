@@ -5,9 +5,8 @@ enum class Screen {
     WEEK,
     MONTH,
     YEAR,
-    MEMORY,
-    PLAN,
     SETTINGS,
-    STATS;
+    STATS,
+    JOURNAL,
+    HABITS;
 }
-

@@ -19,11 +19,11 @@ import kotlin.math.sin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MonthScreen(navController: NavController) {
+fun WeekScreen(navController: NavController) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Month") },
+                title = { Text("Week") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigate(Screen.DAY.name) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to Day")
@@ -44,16 +44,17 @@ fun MonthScreen(navController: NavController) {
             modifier = Modifier.fillMaxSize().padding(padding),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.size(340.dp)) {
+            Canvas(modifier = Modifier.size(300.dp)) {
                 val center = this.center
                 val radius = size.minDimension / 2 - 40.dp.toPx()
-                val polygonRadius = 25.dp.toPx()
+                val pentagonRadius = 30.dp.toPx()
 
-                for (i in 0 until 12) {
-                    val angle = i * (2 * PI / 12) - PI / 2
+                // 7 pentagons arranged in a circle
+                for (i in 0 until 7) {
+                    val angle = i * (2 * PI / 7) - PI / 2
                     val x = center.x + radius * cos(angle).toFloat()
                     val y = center.y + radius * sin(angle).toFloat()
-                    val path = createPolygonPath(x, y, polygonRadius, 12)
+                    val path = createPolygonPath(x, y, pentagonRadius, 5)
                     drawPath(
                         path = path,
                         color = primaryColor,
